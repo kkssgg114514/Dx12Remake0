@@ -1,8 +1,7 @@
-#include "Common.h"
+#include "tiff.h"
 
 //#窗口的句柄，ShowWindow和UpdateWindow函数均要调用此句柄
 //全局范围内创建
-HWND mhMainWnd = 0;
 
 LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -82,11 +81,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, in
 		}
 	}
 	return (int)msg.wParam;
+	/*--------------------------------------------------------------------------------------------------------*/
 }
 
 //#窗口过程函数
 LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+	/*--------------------------------------------------------------------------------------------------------*/
 	//#消息处理
 	switch (msg)
 	{
@@ -99,4 +100,6 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	}
 	//#将上面没有处理的消息转发给默认的窗口过程
 	return DefWindowProc(hwnd, msg, wParam, lParam);
+	/*--------------------------------------------------------------------------------------------------------*/
 }
+
