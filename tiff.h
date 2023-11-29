@@ -1,5 +1,5 @@
 #pragma once
-#include "Common.h"
+
 #include <comdef.h>
 //下面的函数基本不用过于理解，当成固定处理使用即可
 //#AnsiToWString函数（转换成宽字符类型的字符串，wstring）
@@ -15,32 +15,28 @@ class DxException
 {
 public:
 	DxException() = default;
-	DxException(HRESULT hr, const std::wstring& functionName, const std::wstring& filename, int lineNumber);
+	DxException(HRESULT hr, const std::wstring& functionName, const std::wstring& filename, int lineNumber)
+		:ErrorCode(hr),
+		FunctionName(functionName),
+		Filename(filename),
+		LineNumber(lineNumber)
+	{
+	}
 
-	std::wstring ToString()const;
+	std::wstring ToString()const
+	{
+		// #Get the string description of the error code.
+		_com_error err(ErrorCode);
+		std::wstring msg = err.ErrorMessage();
+
+		return FunctionName + L" failed in " + Filename + L"; line " + std::to_wstring(LineNumber) + L"; error: " + msg;
+	}
 
 	HRESULT ErrorCode = S_OK;
 	std::wstring FunctionName;
 	std::wstring Filename;
 	int LineNumber = -1;
 };
-
-DxException::DxException(HRESULT hr, const std::wstring& functionName, const std::wstring& filename, int lineNumber) :
-	ErrorCode(hr),
-	FunctionName(functionName),
-	Filename(filename),
-	LineNumber(lineNumber)
-{
-}
-
-std::wstring DxException::ToString()const
-{
-	// #Get the string description of the error code.
-	_com_error err(ErrorCode);
-	std::wstring msg = err.ErrorMessage();
-
-	return FunctionName + L" failed in " + Filename + L"; line " + std::to_wstring(LineNumber) + L"; error: " + msg;
-}
 
 //#宏定义ThrowIfFailed
 #ifndef ThrowIfFailed

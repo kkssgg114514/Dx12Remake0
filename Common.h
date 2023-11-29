@@ -27,4 +27,6 @@ using namespace Microsoft::WRL;
 #pragma comment(lib, "D3D12.lib")
 #pragma comment(lib, "dxgi.lib")
 
-HWND mhMainWnd = 0;
+//#窗口的句柄，ShowWindow和UpdateWindow函数均要调用此句柄
+//全局范围内创建
+__declspec(selectany) HWND mhMainWnd;

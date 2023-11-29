@@ -1,4 +1,5 @@
 #include "D3D12Init.h"
+#include "tiff.h"
 
 //2创建设备
 void D3D12Init::CreateDevice()
@@ -116,7 +117,7 @@ void D3D12Init::CreateDescriptorHeap()
 	rtvDescriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	rtvDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvDescriptorHeapDesc.NodeMask = 0;
-	ComPtr<ID3D12DescriptorHeap> rtvHeap;
+	//ComPtr<ID3D12DescriptorHeap> rtvHeap;
 	ThrowIfFailed(d3dDevice->CreateDescriptorHeap(&rtvDescriptorHeapDesc, IID_PPV_ARGS(&rtvHeap)));
 
 	//#然后创建DSV堆
@@ -125,7 +126,7 @@ void D3D12Init::CreateDescriptorHeap()
 	dsvDescriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	dsvDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	dsvDescriptorHeapDesc.NodeMask = 0;
-	ComPtr<ID3D12DescriptorHeap> dsvHeap;
+	//ComPtr<ID3D12DescriptorHeap> dsvHeap;
 	ThrowIfFailed(d3dDevice->CreateDescriptorHeap(&dsvDescriptorHeapDesc, IID_PPV_ARGS(&dsvHeap)));
 }
 
@@ -184,15 +185,11 @@ void D3D12Init::CreateDSV()
 										//#由于在创建深度模板资源时已经定义深度模板数据属性，所以这里可以指定为空指针
 		dsvHeap->GetCPUDescriptorHandleForHeapStart());	//DSV句柄
 	
-	//将命令写入命令列表
-	cmdList->ResourceBarrier(1,				//#Barrier屏障个数
-		&CD3DX12_RESOURCE_BARRIER::Transition(depthStencilBuffer.Get(),
-		D3D12_RESOURCE_STATE_COMMON,		//#转换前状态（创建时的状态，即CreateCommittedResource函数中定义的状态）
-		D3D12_RESOURCE_STATE_DEPTH_WRITE));	//#转换后状态为可写入的深度图，还有一个D3D12_RESOURCE_STATE_DEPTH_READ是只可读的深度图
+
 	//将命令从命令列表传入命令队列
-	ThrowIfFailed(cmdList->Close());								//#命令添加完后将其关闭
-	ID3D12CommandList* cmdLists[] = { cmdList.Get() };				//#声明并定义命令列表数组//可能有多个命令列表
-	cmdQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);	//#将命令从命令列表传至命令队列
+	//ThrowIfFailed(cmdList->Close());								//#命令添加完后将其关闭
+	//ID3D12CommandList* cmdLists[] = { cmdList.Get() };				//#声明并定义命令列表数组//可能有多个命令列表
+	//cmdQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);	//#将命令从命令列表传至命令队列
 }
 
 //11设置视口和裁剪矩形
@@ -225,5 +222,86 @@ void D3D12Init::FlushCmdQueue()
 							   //#如果没有Set就Wait，就死锁了，Set永远不会调用，所以也就没线程可以唤醒这个线程）
 		CloseHandle(eventHandle);
 	}
+}
+
+bool D3D12Init::InitDirect3D()
+{
+	//开启调试层
+#if defined(DEBUG) ||defined(_DEBUG)
+	ComPtr<ID3D12Debug> debugController;
+	ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)));
+	debugController->EnableDebugLayer();
+#endif  
+
+	CreateDevice();
+	CreateFence();
+	GetDescriptorSize();
+	SetMSAA();
+	CreateCommandObject();
+	CreateSwapChain();
+	CreateDescriptorHeap();
+	CreateRTV();
+	CreateDSV();
+	CreateViewPortAndScissorRect();
+
+	return true;
+}
+
+void D3D12Init::Draw()
+{
+	//命令分配器内存重置
+	ThrowIfFailed(cmdAllocator->Reset());
+	//命令列表内存重置
+	ThrowIfFailed(cmdList->Reset(cmdAllocator.Get(), nullptr));
+
+	//将后台缓冲区资源从呈现状态转换到渲染目标状态(准备接受图像)
+	UINT& ref_mCurrentBackBuffer = mCurrentBackBuffer;
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(swapChainBuffer[ref_mCurrentBackBuffer].Get(),
+		D3D12_RESOURCE_STATE_PRESENT,
+		D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+	//设置视口和裁剪矩形
+	cmdList->RSSetViewports(1, &viewPort);
+	cmdList->RSSetScissorRects(1, &scissorRect);
+
+	//清除后台缓冲区和深度缓冲区，并赋值（上色）
+	//获取RTV句柄
+	//因为有两个RTV所以也要设置偏移量和大小
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(rtvHeap->GetCPUDescriptorHandleForHeapStart(), ref_mCurrentBackBuffer, rtvDescriptorSize);
+	cmdList->ClearRenderTargetView(rtvHandle, DirectX::Colors::DarkRed, 0, nullptr);//清除RT背景
+	//获取DSV句柄
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+	cmdList->ClearDepthStencilView(dsvHandle,				//DSV描述符
+		D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL,	//FLAG
+		1.0f,												//默认深度值
+		0,													//默认模板值
+		0,													//裁剪矩形数量
+		nullptr);
+
+	//指定要渲染的缓冲区
+	cmdList->OMSetRenderTargets(
+		1,				//待绑定的RTV数量
+		&rtvHandle,		//指向RTV数组的指针
+		true,			//RTV对象在堆内存中是连续存放的
+		&dsvHandle		//指向DSV的指针
+	);
+
+	//等待渲染完成，改变后台缓冲区的状态为呈现状态，这之后会推送到前台缓冲区
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(swapChainBuffer[ref_mCurrentBackBuffer].Get(),
+		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+	//完成后关闭命令列表
+	ThrowIfFailed(cmdList->Close());
+
+	//将等待执行的命令列表加入GPU队列
+	//可能有多个命令列表
+	ID3D12CommandList* commandLists[] = { cmdList.Get() };
+	cmdQueue->ExecuteCommandLists(_countof(commandLists), commandLists);
+
+	//交换前后台缓冲区索引
+	ThrowIfFailed(swapChain->Present(0, 0));
+	ref_mCurrentBackBuffer = (ref_mCurrentBackBuffer + 1) % 2;
+
+	//设置围栏值，使CPU和GPU同步
+	FlushCmdQueue();
 }
 

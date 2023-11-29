@@ -1,5 +1,5 @@
 #pragma once
-#include"tiff.h"
+#include "Common.h"
 
 class D3D12Init
 {
@@ -7,9 +7,13 @@ public:
 	D3D12Init()
 	{
 		mCurrentFence = 0;
+		mCurrentBackBuffer = 0;
+		rtvDescriptorSize = 0;
+		dsvDescriptorSize = 0;
+		cbv_srv_uavDescriptorSize = 0;
 	}
 	~D3D12Init(){}
-public:
+private:
 	//2创建设备
 	void CreateDevice();
 
@@ -40,6 +44,13 @@ public:
 
 	//12实现围栏
 	void FlushCmdQueue();
+
+public:
+	//将以上步骤合成到一个方法中
+	bool InitDirect3D();
+
+	//绘制方法
+	void Draw();
 
 private:
 	//2创建设备
@@ -90,6 +101,9 @@ private:
 	//11设置视口和裁剪矩形
 	D3D12_VIEWPORT viewPort;
 	D3D12_RECT scissorRect;
+
+	//后台缓冲区索引
+	UINT mCurrentBackBuffer;
 
 	//12实现围栏
 	int mCurrentFence;	//初始CPU上的围栏点为0

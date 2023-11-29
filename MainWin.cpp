@@ -1,17 +1,13 @@
+#include "D3D12Init.h"
 #include "tiff.h"
 
-//#窗口的句柄，ShowWindow和UpdateWindow函数均要调用此句柄
-//全局范围内创建
+//创建D3D12Init对象
+D3D12Init* p = new D3D12Init();
 
 LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, int nShowCmd)
+bool InitWindow(HINSTANCE hInstance, int nShowCmd)
 {
-	//创建调试层
-#if defined(DEBUG)|defined(_DEBUG)
-	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-#endif
-
 	/*--------------------------------------------------------------------------------------------------------*/
 	//填写窗口类
 
@@ -33,7 +29,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, in
 	{
 		//#消息框函数，参数1：消息框所属窗口句柄，可为NULL。参数2：消息框显示的文本信息。参数3：标题文本。参数4：消息框样式
 		MessageBox(0, L"RegisterClass Failed", 0, 0);
-		return 0;
+		return false;
 	}
 
 	//#窗口类注册成功
@@ -52,13 +48,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, in
 	if (!mhMainWnd)
 	{
 		MessageBox(0, L"CreatWindow Failed", 0, 0);
-		return 0;
+		return false;
 	}
 	//#窗口创建成功,则显示并更新窗口
 	ShowWindow(mhMainWnd, nShowCmd);
 	UpdateWindow(mhMainWnd);
 
+	return true;
 	/*--------------------------------------------------------------------------------------------------------*/
+}
+
+int Run()
+{
 	//消息循环中检测消息
 
 	//#消息循环
@@ -68,20 +69,58 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, in
 	//#如果GetMessage函数不等于0，说明没有接受到WM_QUIT
 	while (bRet = GetMessage(&msg, 0, 0, 0) != 0)
 	{
-		//#如果等于-1，说明GetMessage函数出错了，弹出错误框
-		if (bRet == -1)
+		//对消息进行拾取
+		if (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
 		{
-			MessageBox(0, L"GetMessage Failed", L"Errow", MB_OK);
+			TranslateMessage(&msg);			//消息转码
+			DispatchMessage(&msg);			//消息分发
 		}
-		//如果等于其他值，说明接收到了消息
 		else
 		{
-			TranslateMessage(&msg);	//#键盘按键转换，将虚拟键消息转换为字符消息
-			DispatchMessage(&msg);	//#把消息分派给相应的窗口过程//分发给回调函数，注册窗口类时填写
+			//否则执行其它代码
+			p->Draw();
 		}
 	}
 	return (int)msg.wParam;
 	/*--------------------------------------------------------------------------------------------------------*/
+}
+
+bool Init(HINSTANCE hInstance, int nShowCmd)
+{
+	if (!InitWindow(hInstance, nShowCmd))
+	{
+		return false;
+	}
+	else if (!p->InitDirect3D())
+	{
+		return false;
+	}
+	else
+	{
+		return true;
+	}
+}
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, int nShowCmd)
+{
+	//创建调试层
+#if defined(DEBUG)|defined(_DEBUG)
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
+	try
+	{
+		if (!Init(hInstance, nShowCmd))
+		{
+			return 0;
+		}
+		return Run();
+	}
+	catch (DxException& e)
+	{
+		MessageBox(nullptr, e.ToString().c_str(), L"HR Failed", MB_OK);
+		return 0;
+	}
+	
 }
 
 //#窗口过程函数
@@ -102,4 +141,5 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProc(hwnd, msg, wParam, lParam);
 	/*--------------------------------------------------------------------------------------------------------*/
 }
+
 
