@@ -24,12 +24,18 @@
     <ClInclude Include="D3D12Init.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="GameTime.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MainWin.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="D3D12Init.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="GameTime.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

@@ -139,10 +139,12 @@
   <ItemGroup>
     <ClInclude Include="Common.h" />
     <ClInclude Include="D3D12Init.h" />
+    <ClInclude Include="GameTime.h" />
     <ClInclude Include="tiff.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D3D12Init.cpp" />
+    <ClCompile Include="GameTime.cpp" />
     <ClCompile Include="MainWin.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

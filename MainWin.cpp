@@ -65,9 +65,9 @@ int Run()
 	//#消息循环
 	//#定义消息结构体
 	MSG msg = { 0 };
-	BOOL bRet = 0;
+
 	//#如果GetMessage函数不等于0，说明没有接受到WM_QUIT
-	while (bRet = GetMessage(&msg, 0, 0, 0) != 0)
+	while (msg.message != WM_QUIT)
 	{
 		//对消息进行拾取
 		if (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
