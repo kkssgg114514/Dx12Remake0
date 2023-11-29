@@ -1,7 +1,11 @@
 #include "D3D12InitApp.h"
 
 D3D12InitApp::D3D12InitApp()
+	:D3D12App()
 {
+	vertexBufferGpu = nullptr; 
+	indexBufferGpu = nullptr;
+	indexBufferCpu = nullptr;
 }
 
 D3D12InitApp::~D3D12InitApp()

@@ -27,6 +27,9 @@
     <ClInclude Include="D3D12InitApp.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="UploadBufferResource.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="GameTime.cpp">

@@ -16,3 +16,4 @@ std::wstring DxException::ToString()const
 
 	return FunctionName + L" failed in " + Filename + L"; line " + std::to_wstring(LineNumber) + L"; error: " + msg;
 }
+

@@ -141,6 +141,7 @@
     <ClInclude Include="D3D12InitApp.h" />
     <ClInclude Include="GameTime.h" />
     <ClInclude Include="ToolFunc.h" />
+    <ClInclude Include="UploadBufferResource.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D3D12App.cpp" />
