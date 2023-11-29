@@ -1,18 +1,28 @@
 #pragma once
-#include "Common.h"
+#include "ToolFunc.h"
+#include "GameTime.h"
+#include "..\Common\d3dx12.h"
 
-class D3D12Init
+using namespace Microsoft::WRL;
+
+#pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "D3D12.lib")
+#pragma comment(lib, "dxgi.lib")
+
+class D3D12App
 {
+protected:
+	D3D12App();
+	virtual ~D3D12App();
+
 public:
-	D3D12Init()
-	{
-		mCurrentFence = 0;
-		mCurrentBackBuffer = 0;
-		rtvDescriptorSize = 0;
-		dsvDescriptorSize = 0;
-		cbv_srv_uavDescriptorSize = 0;
-	}
-	~D3D12Init(){}
+	int Run();
+	bool Init(HINSTANCE hInstance, int nShowCmd);
+	bool InitWindow(HINSTANCE hInstance, int nShowCmd);
+	//将步骤合成到一个方法中
+	bool InitDirect3D();
+	virtual void Draw();
+
 private:
 	//2创建设备
 	void CreateDevice();
@@ -42,17 +52,16 @@ private:
 	//11设置视口和裁剪矩形
 	void CreateViewPortAndScissorRect();
 
+
 	//12实现围栏
 	void FlushCmdQueue();
 
-public:
-	//将以上步骤合成到一个方法中
-	bool InitDirect3D();
+	//计算每帧状态
+	void CalculateFrameState();
 
-	//绘制方法
-	void Draw();
+protected:
+	HWND mhMainWnd = 0;
 
-private:
 	//2创建设备
 	//所有指针的声明
 	//首先创建工厂指针（Factory接口）
@@ -107,5 +116,8 @@ private:
 
 	//12实现围栏
 	int mCurrentFence;	//初始CPU上的围栏点为0
+
+	//GameTime类实例声明
+	GameTime gt;
 };
 

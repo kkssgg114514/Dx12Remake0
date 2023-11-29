@@ -137,15 +137,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Common.h" />
-    <ClInclude Include="D3D12Init.h" />
+    <ClInclude Include="D3D12App.h" />
+    <ClInclude Include="D3D12InitApp.h" />
     <ClInclude Include="GameTime.h" />
-    <ClInclude Include="tiff.h" />
+    <ClInclude Include="ToolFunc.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="D3D12Init.cpp" />
+    <ClCompile Include="D3D12App.cpp" />
+    <ClCompile Include="D3D12InitApp.cpp" />
     <ClCompile Include="GameTime.cpp" />
-    <ClCompile Include="MainWin.cpp" />
+    <ClCompile Include="ToolFunc.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

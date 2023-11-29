@@ -15,27 +15,30 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Common.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="tiff.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="D3D12Init.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="GameTime.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ToolFunc.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="D3D12App.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="D3D12InitApp.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="MainWin.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="D3D12Init.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="GameTime.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="ToolFunc.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="D3D12App.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="D3D12InitApp.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
