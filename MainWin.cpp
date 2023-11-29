@@ -1,8 +1,34 @@
 #include "D3D12Init.h"
 #include "tiff.h"
+#include "GameTime.h"
 
 //创建D3D12Init对象
 D3D12Init* p = new D3D12Init();
+GameTime* gt = new GameTime();
+
+void CalculateFrameState()
+{
+	static int frameCnt = 0;			//总帧数
+	static float timeElapsed = 0.0f;	//经过的时间
+	frameCnt++;							//每帧都加一
+
+	//判断每秒刷新一次
+	if (gt->TotalTime() - timeElapsed >= 1.0f)
+	{
+		float fps = (float)frameCnt;	//每秒帧数
+		float mspf = 1000.0f / fps;		//每帧时长
+
+		std::wstring fpsStr = std::to_wstring(fps);
+		std::wstring mspfStr = std::to_wstring(mspf);
+		//将帧数据显示在窗口上
+		std::wstring windowText = L"D3D12Init	fps: " + fpsStr + L"	mspf: " + mspfStr;
+		SetWindowText(mhMainWnd, windowText.c_str());
+
+		//为计算下一组重置
+		frameCnt = 0;
+		timeElapsed += 1.0f;
+	}
+}
 
 LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -65,7 +91,7 @@ int Run()
 	//#消息循环
 	//#定义消息结构体
 	MSG msg = { 0 };
-
+	gt->Reset();
 	//#如果GetMessage函数不等于0，说明没有接受到WM_QUIT
 	while (msg.message != WM_QUIT)
 	{
@@ -77,8 +103,18 @@ int Run()
 		}
 		else
 		{
-			//否则执行其它代码
-			p->Draw();
+			gt->Tick();//计算每两帧间隔
+			if (!gt->IsStoped())
+			{
+				//处于运行状态才运行游戏
+				CalculateFrameState();
+				p->Draw();
+			}
+			else
+			{
+				//处于暂停状态，休眠100ms
+				Sleep(100);
+			}
 		}
 	}
 	return (int)msg.wParam;
