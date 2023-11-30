@@ -1,5 +1,4 @@
 #include "D3D12App.h"
-#include "UploadBufferResource.h"
 
 LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -41,6 +40,7 @@ int D3D12App::Run()
 				//处于运行状态才运行游戏
 				CalculateFrameState();
 				Draw();
+				Update();
 			}
 			else
 			{
@@ -53,7 +53,7 @@ int D3D12App::Run()
 	/*--------------------------------------------------------------------------------------------------------*/
 }
 
-bool D3D12App::Init(HINSTANCE hInstance, int nShowCmd)
+bool D3D12App::Init(HINSTANCE hInstance, int nShowCmd, std::wstring customCaption)
 {
 	if (!InitWindow(hInstance, nShowCmd))
 	{
@@ -204,6 +204,10 @@ void D3D12App::Draw()
 	FlushCmdQueue();
 }
 
+void D3D12App::Update()
+{
+}
+
 void D3D12App::CreateDevice()
 {
 	/*--------------------------------------------------------------------------------------------------------*/
@@ -325,15 +329,6 @@ void D3D12App::CreateDescriptorHeap()
 	//ComPtr<ID3D12DescriptorHeap> dsvHeap;
 	ThrowIfFailed(d3dDevice->CreateDescriptorHeap(&dsvDescriptorHeapDesc, IID_PPV_ARGS(&dsvHeap)));
 
-	objConstSize = CalcConstantBufferByteSize(sizeof(ObjectConstants));
-	//#创建CBV堆
-	//ComPtr<ID3D12DescriptorHeap> cbvHeap;
-	D3D12_DESCRIPTOR_HEAP_DESC cbHeapDesc;
-	cbHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	cbHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	cbHeapDesc.NumDescriptors = 1;
-	cbHeapDesc.NodeMask = 0;
-	ThrowIfFailed(d3dDevice->CreateDescriptorHeap(&cbHeapDesc, IID_PPV_ARGS(&cbvHeap)));
 }
 
 void D3D12App::CreateRTV()
@@ -399,8 +394,13 @@ void D3D12App::CreateDSV()
 
 void D3D12App::CreateVertexView()
 {
-	ComPtr<ID3D12Resource> vertexBufferUploader = nullptr;
-	vertexBufferGpu = CreateDefaultBuffer(d3dDevice.Get(), cmdList.Get(), sizeof(vertices), vertices.data(), vertexBufferUploader);
+	vertexBufferUploader = nullptr;
+	vbByteSize = sizeof(indices);
+
+
+	ThrowIfFailed(D3DCreateBlob(vbByteSize, &vertexBufferCpu));	//创建索引数据内存空间
+	CopyMemory(vertexBufferCpu->GetBufferPointer(), vertices.data(), vbByteSize);//将索引数据拷贝至系统索引内存中
+	vertexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(), cmdList.Get(), vbByteSize, vertices.data(), vertexBufferUploader.Get());
 	//将顶点数据绑定至渲染流水线
 	D3D12_VERTEX_BUFFER_VIEW vbv;
 	vbv.BufferLocation = vertexBufferGpu->GetGPUVirtualAddress();	//顶点缓冲区（默认堆）资源虚拟地址
@@ -412,35 +412,16 @@ void D3D12App::CreateVertexView()
 
 void D3D12App::CreateIndexView()
 {
-	ComPtr<ID3D12Resource> indexBufferUploader = nullptr;
-	SIZE_T ibByteSize = sizeof(indices);
+	indexBufferUploader = nullptr;
+	ibByteSize = sizeof(indices);
 
 	ThrowIfFailed(D3DCreateBlob(ibByteSize, &indexBufferCpu));	//创建索引数据内存空间
 	CopyMemory(indexBufferCpu->GetBufferPointer(), indices.data(), ibByteSize);//将索引数据拷贝至系统索引内存中
-	indexBufferGpu = CreateDefaultBuffer(d3dDevice.Get(), cmdList.Get(), ibByteSize, indices.data(), indexBufferUploader);
+	indexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(), cmdList.Get(), ibByteSize, indices.data(), indexBufferUploader.Get());
 	D3D12_INDEX_BUFFER_VIEW ibv;
 	ibv.BufferLocation = indexBufferGpu->GetGPUVirtualAddress();
 	ibv.Format = DXGI_FORMAT_R16_UINT;
 	ibv.SizeInBytes = ibByteSize;
-}
-
-void D3D12App::CreateCBV()
-{
-	//#定义并获得物体的常量缓冲区，然后得到其首地址
-	std::unique_ptr<UploadBufferResource<ObjectConstants>> objCB = nullptr;
-	//#elementCount为1（1个子物体常量缓冲元素），isConstantBuffer为ture（是常量缓冲区）
-	objCB = std::make_unique<UploadBufferResource<ObjectConstants>>(d3dDevice.Get(), 1, true);
-	//#获得常量缓冲区首地址
-	D3D12_GPU_VIRTUAL_ADDRESS address;
-	address = objCB->Resource()->GetGPUVirtualAddress();
-	//#通过常量缓冲区元素偏移值计算最终的元素地址
-	int cbElementIndex = 0;	//#常量缓冲区元素下标
-	address += cbElementIndex * objConstSize;
-	//#创建CBV描述符
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
-	cbvDesc.BufferLocation = address;
-	cbvDesc.SizeInBytes = objConstSize;
-	d3dDevice->CreateConstantBufferView(&cbvDesc, cbvHeap->GetCPUDescriptorHandleForHeapStart());
 }
 
 void D3D12App::CreateViewPortAndScissorRect()

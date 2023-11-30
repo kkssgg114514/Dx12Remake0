@@ -1,17 +1,12 @@
 #pragma once
 #include "ToolFunc.h"
 #include "GameTime.h"
-#include "..\Common\d3dx12.h"
 #include "..\Common\MathHelper.h"
 
-
-using namespace Microsoft::WRL;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
 
-#pragma comment(lib, "d3dcompiler.lib")
-#pragma comment(lib, "D3D12.lib")
-#pragma comment(lib, "dxgi.lib")
+
 
 struct ObjectConstants
 {
@@ -25,46 +20,6 @@ struct Vertex
 	XMFLOAT4 Color;
 };
 
-//#实例化顶点结构体并填充
-std::array<Vertex, 8> vertices =
-{
-	Vertex({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::White) }),
-	Vertex({ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Black) }),
-	Vertex({ XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Red) }),
-	Vertex({ XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::Green) }),
-	Vertex({ XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Blue) }),
-	Vertex({ XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Yellow) }),
-	Vertex({ XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Cyan) }),
-	Vertex({ XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Magenta) })
-};
-
-std::array<std::uint16_t, 36> indices =
-{
-	//前
-	0, 1, 2,
-	0, 2, 3,
-
-	//后
-	4, 6, 5,
-	4, 7, 6,
-
-	//左
-	4, 5, 1,
-	4, 1, 0,
-
-	//右
-	3, 2, 6,
-	3, 6, 7,
-
-	//上
-	1, 5, 6,
-	1, 6, 2,
-
-	//下
-	4, 0, 3,
-	4, 3, 7
-};
-
 class D3D12App
 {
 protected:
@@ -73,11 +28,12 @@ protected:
 
 public:
 	int Run();
-	bool Init(HINSTANCE hInstance, int nShowCmd);
+	bool Init(HINSTANCE hInstance, int nShowCmd, std::wstring customCaption);
 	bool InitWindow(HINSTANCE hInstance, int nShowCmd);
 	//将步骤合成到一个方法中
 	virtual bool InitDirect3D();
 	virtual void Draw();
+	virtual void Update();
 
 protected:
 	//2创建设备
@@ -106,7 +62,6 @@ protected:
 	void CreateDSV();
 	void CreateVertexView();
 	void CreateIndexView();
-	void CreateCBV();
 
 	//11设置视口和裁剪矩形
 	void CreateViewPortAndScissorRect();
@@ -162,8 +117,6 @@ protected:
 	//创建dsv堆指针
 	ComPtr<ID3D12DescriptorHeap> dsvHeap;
 
-	ComPtr<ID3D12DescriptorHeap> cbvHeap;
-
 	//9创建描述符
 	//创建交换链缓冲区指针（用于获取交换链中的后台缓冲区资源）
 	ComPtr<ID3D12Resource> swapChainBuffer[2];
@@ -183,9 +136,57 @@ protected:
 	//GameTime类实例声明
 	GameTime gt;
 
+	SIZE_T vbByteSize;
+	SIZE_T ibByteSize;
+
+	ComPtr<ID3D12Resource> vertexBufferUploader;
+	ComPtr<ID3D12Resource> indexBufferUploader;
+
 	ComPtr<ID3D12Resource> vertexBufferGpu;
 	ComPtr<ID3D12Resource> indexBufferGpu;
 
+
+	ComPtr<ID3DBlob> vertexBufferCpu;
 	ComPtr<ID3DBlob> indexBufferCpu;
+
+	//#实例化顶点结构体并填充
+	std::array<Vertex, 8> vertices =
+	{
+		Vertex({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::White) }),
+		Vertex({ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Black) }),
+		Vertex({ XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Red) }),
+		Vertex({ XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::Green) }),
+		Vertex({ XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Blue) }),
+		Vertex({ XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Yellow) }),
+		Vertex({ XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Cyan) }),
+		Vertex({ XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Magenta) })
+	};
+
+	std::array<std::uint16_t, 36> indices =
+	{
+		//前
+		0, 1, 2,
+		0, 2, 3,
+
+		//后
+		4, 6, 5,
+		4, 7, 6,
+
+		//左
+		4, 5, 1,
+		4, 1, 0,
+
+		//右
+		3, 2, 6,
+		3, 6, 7,
+
+		//上
+		1, 5, 6,
+		1, 6, 2,
+
+		//下
+		4, 0, 3,
+		4, 3, 7
+	};
 };
 

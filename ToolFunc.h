@@ -19,7 +19,14 @@
 #include <sstream>
 #include <windowsx.h>
 #include <comdef.h>
+#include "..\Common\d3dx12.h"
 
+using namespace Microsoft::WRL;
+
+#pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "D3D12.lib")
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "dxguid.lib")
 
 //下面的函数基本不用过于理解，当成固定处理使用即可
 //#AnsiToWString函数（转换成宽字符类型的字符串，wstring）
@@ -55,55 +62,24 @@ public:
 }
 #endif
 
-UINT CalcConstantBufferByteSize(UINT byteSize)
+class ToolFunc
 {
-	return (byteSize + 255) & ~255;
-}
+public:
+	static ComPtr<ID3D12Resource> CreateDefaultBuffer(
+		ID3D12Device* d3dDevice,
+		ID3D12GraphicsCommandList* cmdList,
+		UINT64 byteSize,
+		const void* initData,
+		ComPtr<ID3D12Resource> uploadBuffer
+	);
 
-ComPtr<ID3D12Resource> CreateDefaultBuffer(ID3D12Device* d3dDevice, ID3D12GraphicsCommandList* cmdList, UINT64 byteSize, const void* initData, ComPtr<ID3D12Resource>& uploadBuffer)
-{
-	//创建上传堆，作用是将CPU写入的数据写入这个堆完成后传输给默认堆
-	ThrowIfFailed(d3dDevice->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(byteSize),		//传入数据大小，其它参数默认
-		D3D12_RESOURCE_STATE_GENERIC_READ,				//上传堆数据需要被复制，设置为可读
-		nullptr,										//不是深度模板资源，不用指定优化值
-		IID_PPV_ARGS(&uploadBuffer)
-	));
+	static ComPtr<ID3DBlob> CompileShader(
+		const std::wstring& filename,
+		const D3D_SHADER_MACRO* defines,
+		const std::string& entryPoint,
+		const std::string& target
+	);
 
-	//创建默认堆
-	ComPtr<ID3D12Resource> defaultBuffer;
-	ThrowIfFailed(d3dDevice->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),	//堆的类型为默认堆
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(byteSize),
-		D3D12_RESOURCE_STATE_COMMON,						//默认堆为最终保存数据的地方，初始化为普通状态
-		nullptr,
-		IID_PPV_ARGS(&defaultBuffer)
-	));
+	static UINT CalcConstantBufferByteSize(UINT byteSize);
 
-	//将资源从COMMON状态变为COPY_DEST状态，默认堆是接收数据的目标
-	cmdList->ResourceBarrier(1,
-		&CD3DX12_RESOURCE_BARRIER::Transition(defaultBuffer.Get(),
-			D3D12_RESOURCE_STATE_COMMON,
-			D3D12_RESOURCE_STATE_COPY_DEST));
-
-	//将数据从CPU内存拷贝到GPU缓存
-	//先创建子资源表单
-	D3D12_SUBRESOURCE_DATA subResourceData;
-	subResourceData.pData = initData;
-	subResourceData.RowPitch = byteSize;
-	subResourceData.SlicePitch = subResourceData.RowPitch;
-
-	//核心函数UpdateSubresources，将数据从CPU内存拷贝至上传堆，再从上传堆拷贝至默认堆
-	UpdateSubresources<1>(cmdList, defaultBuffer.Get(), uploadBuffer.Get(), 0, 0, 1, &subResourceData);
-
-	//再次将资源从COPT_DEST状态转换到GENERIC_READ状态（只提供给着色器访问）
-	cmdList->ResourceBarrier(1,
-		&CD3DX12_RESOURCE_BARRIER::Transition(defaultBuffer.Get(),
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			D3D12_RESOURCE_STATE_GENERIC_READ));
-
-	return defaultBuffer;
-}
+};

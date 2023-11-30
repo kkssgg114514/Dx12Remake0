@@ -10,7 +10,7 @@ public:
 		elementByteSize = sizeof(T);//#如果不是常量缓冲区，则直接计算缓存大小
 
 		if (isConstantBuffer)
-			elementByteSize = CalcConstantBufferByteSize(sizeof(T));//#如果是常量缓冲区，则以256的倍数计算缓存大小
+			elementByteSize = ToolFunc::CalcConstantBufferByteSize(sizeof(T));//#如果是常量缓冲区，则以256的倍数计算缓存大小
 		//#创建上传堆和资源
 		ThrowIfFailed(d3dDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 			D3D12_HEAP_FLAG_NONE,
@@ -19,9 +19,9 @@ public:
 			nullptr,
 			IID_PPV_ARGS(&uploadBuffer)));
 		//#返回欲更新资源的指针
-		uploadBuffer->Map(0,										//#子资源索引，对于缓冲区来说，他的子资源就是自己
-			nullptr,												//#对整个资源进行映射
-			ThrowIfFailed(reinterpret_cast<void**>(&mappedData)));	//#返回待映射资源数据的目标内存块	
+		ThrowIfFailed(uploadBuffer->Map(0,					//#子资源索引，对于缓冲区来说，他的子资源就是自己
+			nullptr,										//#对整个资源进行映射
+			reinterpret_cast<void**>(&mappedData)));		//#返回待映射资源数据的目标内存块	
 	}
 
 	~UploadBufferResource()
