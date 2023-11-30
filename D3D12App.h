@@ -32,8 +32,8 @@ public:
 	bool InitWindow(HINSTANCE hInstance, int nShowCmd);
 	//将步骤合成到一个方法中
 	virtual bool InitDirect3D();
-	virtual void Draw();
-	virtual void Update();
+	virtual void Draw() = 0;
+	virtual void Update() = 0;
 
 protected:
 	//2创建设备
@@ -60,8 +60,6 @@ protected:
 	//9创建描述符
 	void CreateRTV();
 	void CreateDSV();
-	void CreateVertexView();
-	void CreateIndexView();
 
 	//11设置视口和裁剪矩形
 	void CreateViewPortAndScissorRect();
@@ -96,7 +94,7 @@ protected:
 	UINT dsvDescriptorSize;
 	UINT cbv_srv_uavDescriptorSize;
 
-	UINT objConstSize;
+	
 
 	//5设置MSAA抗锯齿属性
 	//设置MSAA抗锯齿等级
@@ -122,6 +120,7 @@ protected:
 	ComPtr<ID3D12Resource> swapChainBuffer[2];
 	//创建深度缓冲区指针
 	ComPtr<ID3D12Resource> depthStencilBuffer;
+
 
 	//11设置视口和裁剪矩形
 	D3D12_VIEWPORT viewPort;
@@ -149,44 +148,6 @@ protected:
 	ComPtr<ID3DBlob> vertexBufferCpu;
 	ComPtr<ID3DBlob> indexBufferCpu;
 
-	//#实例化顶点结构体并填充
-	std::array<Vertex, 8> vertices =
-	{
-		Vertex({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::White) }),
-		Vertex({ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Black) }),
-		Vertex({ XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Red) }),
-		Vertex({ XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::Green) }),
-		Vertex({ XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Blue) }),
-		Vertex({ XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Yellow) }),
-		Vertex({ XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Cyan) }),
-		Vertex({ XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Magenta) })
-	};
-
-	std::array<std::uint16_t, 36> indices =
-	{
-		//前
-		0, 1, 2,
-		0, 2, 3,
-
-		//后
-		4, 6, 5,
-		4, 7, 6,
-
-		//左
-		4, 5, 1,
-		4, 1, 0,
-
-		//右
-		3, 2, 6,
-		3, 6, 7,
-
-		//上
-		1, 5, 6,
-		1, 6, 2,
-
-		//下
-		4, 0, 3,
-		4, 3, 7
-	};
+	
 };
 

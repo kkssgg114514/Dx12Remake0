@@ -21,15 +21,15 @@ public:
 
     void CreateCBV();
 
-    void Update() override;
+    virtual void Update() override;
+    //继承重载绘制函数
+    virtual void Draw() override;
 
     D3D12_VERTEX_BUFFER_VIEW GetVbv()const;
     D3D12_INDEX_BUFFER_VIEW GetIbv()const;
 
 private:
-	//继承重载绘制函数
-    virtual void Draw() override;
-
+	
     ComPtr<ID3D12RootSignature> rootSignature;
 
     std::vector<D3D12_INPUT_ELEMENT_DESC> inputLayoutDesc;

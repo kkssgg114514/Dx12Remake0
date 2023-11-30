@@ -39,8 +39,8 @@ int D3D12App::Run()
 			{
 				//处于运行状态才运行游戏
 				CalculateFrameState();
-				Draw();
 				Update();
+				Draw();
 			}
 			else
 			{
@@ -114,7 +114,7 @@ bool D3D12App::InitWindow(HINSTANCE hInstance, int nShowCmd)
 		return false;
 	}
 	//#窗口创建成功,则显示并更新窗口
-	ShowWindow(mhMainWnd, nShowCmd);
+	ShowWindow(mhMainWnd, SW_SHOW);
 	UpdateWindow(mhMainWnd);
 
 	return true;
@@ -139,73 +139,10 @@ bool D3D12App::InitDirect3D()
 	CreateDescriptorHeap();
 	CreateRTV();
 	CreateDSV();
-	CreateVertexView();
-	CreateIndexView();
 	CreateViewPortAndScissorRect();
+	
 
 	return true;
-}
-
-void D3D12App::Draw()
-{
-	//命令分配器内存重置
-	ThrowIfFailed(cmdAllocator->Reset());
-	//命令列表内存重置
-	ThrowIfFailed(cmdList->Reset(cmdAllocator.Get(), nullptr));
-
-	//将后台缓冲区资源从呈现状态转换到渲染目标状态(准备接受图像)
-	UINT& ref_mCurrentBackBuffer = mCurrentBackBuffer;
-	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(swapChainBuffer[ref_mCurrentBackBuffer].Get(),
-		D3D12_RESOURCE_STATE_PRESENT,
-		D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-	//设置视口和裁剪矩形
-	cmdList->RSSetViewports(1, &viewPort);
-	cmdList->RSSetScissorRects(1, &scissorRect);
-
-	//清除后台缓冲区和深度缓冲区，并赋值（上色）
-	//获取RTV句柄
-	//因为有两个RTV所以也要设置偏移量和大小
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(rtvHeap->GetCPUDescriptorHandleForHeapStart(), ref_mCurrentBackBuffer, rtvDescriptorSize);
-	cmdList->ClearRenderTargetView(rtvHandle, DirectX::Colors::LightBlue, 0, nullptr);//清除RT背景
-	//获取DSV句柄
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
-	cmdList->ClearDepthStencilView(dsvHandle,				//DSV描述符
-		D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL,	//FLAG
-		1.0f,												//默认深度值
-		0,													//默认模板值
-		0,													//裁剪矩形数量
-		nullptr);
-
-	//指定要渲染的缓冲区
-	cmdList->OMSetRenderTargets(
-		1,				//待绑定的RTV数量
-		&rtvHandle,		//指向RTV数组的指针
-		true,			//RTV对象在堆内存中是连续存放的
-		&dsvHandle		//指向DSV的指针
-	);
-
-	//等待渲染完成，改变后台缓冲区的状态为呈现状态，这之后会推送到前台缓冲区
-	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(swapChainBuffer[ref_mCurrentBackBuffer].Get(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-	//完成后关闭命令列表
-	ThrowIfFailed(cmdList->Close());
-
-	//将等待执行的命令列表加入GPU队列
-	//可能有多个命令列表
-	ID3D12CommandList* commandLists[] = { cmdList.Get() };
-	cmdQueue->ExecuteCommandLists(_countof(commandLists), commandLists);
-
-	//交换前后台缓冲区索引
-	ThrowIfFailed(swapChain->Present(0, 0));
-	ref_mCurrentBackBuffer = (ref_mCurrentBackBuffer + 1) % 2;
-
-	//设置围栏值，使CPU和GPU同步
-	FlushCmdQueue();
-}
-
-void D3D12App::Update()
-{
 }
 
 void D3D12App::CreateDevice()
@@ -219,7 +156,7 @@ void D3D12App::CreateDevice()
 	//ComPtr<ID3D12Device> d3dDevice;
 	ThrowIfFailed(D3D12CreateDevice(
 		nullptr,						//#此参数如果设置为nullptr，则使用主适配器
-		D3D_FEATURE_LEVEL_12_0,			//#应用程序需要硬件所支持的最低功能级别
+		D3D_FEATURE_LEVEL_11_0,			//#应用程序需要硬件所支持的最低功能级别
 		IID_PPV_ARGS(&d3dDevice)		//#返回所建设备
 	));
 	/*--------------------------------------------------------------------------------------------------------*/
@@ -333,13 +270,15 @@ void D3D12App::CreateDescriptorHeap()
 
 void D3D12App::CreateRTV()
 {
+	ThrowIfFailed(cmdList->Reset(cmdAllocator.Get(), nullptr));
+	
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHeapHandle(rtvHeap->GetCPUDescriptorHandleForHeapStart());
 	//创建交换链缓冲区指针（用于获取交换链中的后台缓冲区资源）
 	//ComPtr<ID3D12Resource> swapChainBuffer[2];
 	for (int i = 0; i < 2; i++)
 	{
 		//#获得存于交换链中的后台缓冲区资源
-		swapChain->GetBuffer(i, IID_PPV_ARGS(swapChainBuffer[i].GetAddressOf()));
+		ThrowIfFailed(swapChain->GetBuffer(i, IID_PPV_ARGS(swapChainBuffer[i].GetAddressOf())));
 		//#创建RTV
 		d3dDevice->CreateRenderTargetView(
 			swapChainBuffer[i].Get(),
@@ -362,13 +301,13 @@ void D3D12App::CreateDSV()
 	dsvResourceDesc.MipLevels = 1;										//#MIPMAP层级数量
 	dsvResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;				//#指定纹理布局（这里不指定）
 	dsvResourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;	//#深度模板资源的Flag
-	dsvResourceDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;				//#24位深度，8位模板,还有个无类型的格式DXGI_FORMAT_R24G8_TYPELESS也可以使用
+	dsvResourceDesc.Format = DXGI_FORMAT_R24G8_TYPELESS;				//#24位深度，8位模板,还有个无类型的格式DXGI_FORMAT_R24G8_TYPELESS也可以使用
 	dsvResourceDesc.SampleDesc.Count = 4;								//#多重采样数量
 	dsvResourceDesc.SampleDesc.Quality = msaaQualityLevels.NumQualityLevels - 1;	//#多重采样质量
 
 	CD3DX12_CLEAR_VALUE optClear;						//#清除资源的优化值，提高清除操作的执行速度（CreateCommittedResource函数中传入）
 	optClear.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;	//#24位深度，8位模板,还有个无类型的格式DXGI_FORMAT_R24G8_TYPELESS也可以使用
-	optClear.DepthStencil.Depth = 1;					//#初始深度值为1
+	optClear.DepthStencil.Depth = 1.0f;					//#初始深度值为1
 	optClear.DepthStencil.Stencil = 0;					//#初始模板值为0
 
 	//#创建一个资源和一个堆，并将资源提交至堆中（将深度模板数据提交至GPU显存中）
@@ -380,48 +319,32 @@ void D3D12App::CreateDSV()
 		&optClear,																						//#上面定义的优化值指针
 		IID_PPV_ARGS(&depthStencilBuffer)));															//#返回深度模板资源
 
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
+	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	dsvDesc.Texture2D.MipSlice = 0;
+
 	d3dDevice->CreateDepthStencilView(depthStencilBuffer.Get(),
-		nullptr,						//#D3D12_DEPTH_STENCIL_VIEW_DESC类型指针，可填&dsvDesc（见上注释代码），
+		&dsvDesc,						//#D3D12_DEPTH_STENCIL_VIEW_DESC类型指针，可填&dsvDesc（见上注释代码），
 										//#由于在创建深度模板资源时已经定义深度模板数据属性，所以这里可以指定为空指针
 		dsvHeap->GetCPUDescriptorHandleForHeapStart());	//DSV句柄
 
+	//ThrowIfFailed(d3dDevice->GetDeviceRemovedReason());
+
+	cmdList->ResourceBarrier(1,	//Barrier屏障个数
+		&CD3DX12_RESOURCE_BARRIER::Transition(depthStencilBuffer.Get(),
+			D3D12_RESOURCE_STATE_COMMON,	//转换前状态（创建时的状态，即CreateCommittedResource函数中定义的状态）
+			D3D12_RESOURCE_STATE_DEPTH_WRITE));	//转换后状态为可写入的深度图，还有一个D3D12_RESOURCE_STATE_DEPTH_READ是只可读的深度图
+
 
 	//将命令从命令列表传入命令队列
-	//ThrowIfFailed(cmdList->Close());								//#命令添加完后将其关闭
-	//ID3D12CommandList* cmdLists[] = { cmdList.Get() };				//#声明并定义命令列表数组//可能有多个命令列表
-	//cmdQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);	//#将命令从命令列表传至命令队列
-}
+	ThrowIfFailed(cmdList->Close());								//#命令添加完后将其关闭
+	ID3D12CommandList* cmdLists[] = { cmdList.Get() };				//#声明并定义命令列表数组//可能有多个命令列表
+	cmdQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);	//#将命令从命令列表传至命令队列
 
-void D3D12App::CreateVertexView()
-{
-	vertexBufferUploader = nullptr;
-	vbByteSize = sizeof(indices);
+	FlushCmdQueue();
 
-
-	ThrowIfFailed(D3DCreateBlob(vbByteSize, &vertexBufferCpu));	//创建索引数据内存空间
-	CopyMemory(vertexBufferCpu->GetBufferPointer(), vertices.data(), vbByteSize);//将索引数据拷贝至系统索引内存中
-	vertexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(), cmdList.Get(), vbByteSize, vertices.data(), vertexBufferUploader.Get());
-	//将顶点数据绑定至渲染流水线
-	D3D12_VERTEX_BUFFER_VIEW vbv;
-	vbv.BufferLocation = vertexBufferGpu->GetGPUVirtualAddress();	//顶点缓冲区（默认堆）资源虚拟地址
-	vbv.SizeInBytes = sizeof(Vertex) * 8;							//顶点缓冲区大小
-	vbv.StrideInBytes = sizeof(Vertex);								//每个顶点占用的字节数
-	//设置顶点缓冲区
-	cmdList->IASetVertexBuffers(0, 1, &vbv);
-}
-
-void D3D12App::CreateIndexView()
-{
-	indexBufferUploader = nullptr;
-	ibByteSize = sizeof(indices);
-
-	ThrowIfFailed(D3DCreateBlob(ibByteSize, &indexBufferCpu));	//创建索引数据内存空间
-	CopyMemory(indexBufferCpu->GetBufferPointer(), indices.data(), ibByteSize);//将索引数据拷贝至系统索引内存中
-	indexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(), cmdList.Get(), ibByteSize, indices.data(), indexBufferUploader.Get());
-	D3D12_INDEX_BUFFER_VIEW ibv;
-	ibv.BufferLocation = indexBufferGpu->GetGPUVirtualAddress();
-	ibv.Format = DXGI_FORMAT_R16_UINT;
-	ibv.SizeInBytes = ibByteSize;
 }
 
 void D3D12App::CreateViewPortAndScissorRect()
@@ -438,6 +361,7 @@ void D3D12App::CreateViewPortAndScissorRect()
 	scissorRect.top = 0;
 	scissorRect.right = 1280;
 	scissorRect.bottom = 720;
+
 }
 
 void D3D12App::FlushCmdQueue()
