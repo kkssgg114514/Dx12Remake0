@@ -8,9 +8,13 @@ using namespace DirectX;
 using namespace DirectX::PackedVector;
 
 //定义顶点结构体
-struct Vertex
+struct VPosData
 {
     XMFLOAT3 Pos;
+};
+
+struct VColorData
+{
     XMFLOAT4 Color;
 };
 
@@ -46,7 +50,9 @@ private:
     void BuildBoxGeometry();
     void BuildPSO();
 
-    D3D12_VERTEX_BUFFER_VIEW GetVbv()const;
+    //D3D12_VERTEX_BUFFER_VIEW GetVbv()const;
+    D3D12_VERTEX_BUFFER_VIEW GetVPosBufferView() const;
+    D3D12_VERTEX_BUFFER_VIEW GetVColorBufferView() const;
     D3D12_INDEX_BUFFER_VIEW GetIbv()const;
 
 private:
@@ -76,21 +82,26 @@ private:
 
     POINT mLastMousePos;
 
-    UINT vbByteSize = 0;
-    UINT ibByteSize = 0;
-
-    ComPtr<ID3D12Resource> vertexBufferUploader;
+    //ComPtr<ID3D12Resource> vertexBufferUploader;
+    ComPtr<ID3D12Resource> vPosBufferUploader;
+    ComPtr<ID3D12Resource> vColorBufferUploader;
     ComPtr<ID3D12Resource> indexBufferUploader;
 
-    ComPtr<ID3D12Resource> vertexBufferGpu;
+    //ComPtr<ID3D12Resource> vertexBufferGpu;
+    ComPtr<ID3D12Resource> vPosBufferGpu;
+    ComPtr<ID3D12Resource> vColorBufferGpu;
     ComPtr<ID3D12Resource> indexBufferGpu;
 
 
-    ComPtr<ID3DBlob> vertexBufferCpu;
+    //ComPtr<ID3DBlob> vertexBufferCpu;
+    ComPtr<ID3DBlob> vPosBufferCpu;
+    ComPtr<ID3DBlob> vColorBufferCpu;
     ComPtr<ID3DBlob> indexBufferCpu;
 
     UINT VertexByteStride = 0;
-    UINT VertexBufferByteSize = 0;
+    //UINT VertexBufferByteSize = 0;
+    UINT vPosBufferByteSize = 0;
+    UINT vColorBufferByteSize = 0;
     DXGI_FORMAT IndexFormat = DXGI_FORMAT_R16_UINT;
     UINT IndexBufferByteSize = 0;
 

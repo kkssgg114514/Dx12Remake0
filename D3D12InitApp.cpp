@@ -122,7 +122,8 @@ void D3D12InitApp::Draw(const GameTime& gt)
 
     mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
-    mCommandList->IASetVertexBuffers(0, 1, &GetVbv());
+    mCommandList->IASetVertexBuffers(0, 1, &GetVPosBufferView());
+    mCommandList->IASetVertexBuffers(1, 1, &GetVColorBufferView());
     mCommandList->IASetIndexBuffer(&GetIbv());
     mCommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -278,23 +279,35 @@ void D3D12InitApp::BuildShadersAndInputLayout()
     mInputLayout =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+        { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
     };
 }
 
 void D3D12InitApp::BuildBoxGeometry()
 {
     //顶点表
-    std::array<Vertex, 8> vertices =
+    std::array<VPosData, 8> verticesPos =
     {
-        Vertex({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::White) }),
-        Vertex({ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Black) }),
-        Vertex({ XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Red) }),
-        Vertex({ XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::Green) }),
-        Vertex({ XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Blue) }),
-        Vertex({ XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Yellow) }),
-        Vertex({ XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Cyan) }),
-        Vertex({ XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Magenta) })
+        VPosData({ XMFLOAT3(-1.0f, -1.0f, -1.0f) }),
+        VPosData({ XMFLOAT3(-1.0f, +1.0f, -1.0f) }),
+        VPosData({ XMFLOAT3(+1.0f, +1.0f, -1.0f) }),
+        VPosData({ XMFLOAT3(+1.0f, -1.0f, -1.0f) }),
+        VPosData({ XMFLOAT3(-1.0f, -1.0f, +1.0f) }),
+        VPosData({ XMFLOAT3(-1.0f, +1.0f, +1.0f) }),
+        VPosData({ XMFLOAT3(+1.0f, +1.0f, +1.0f) }),
+        VPosData({ XMFLOAT3(+1.0f, -1.0f, +1.0f) })
+    };
+
+    std::array<VColorData, 8> verticesColor =
+    {
+        VColorData({ XMFLOAT4(Colors::White) }),
+        VColorData({ XMFLOAT4(Colors::Black) }),
+        VColorData({ XMFLOAT4(Colors::Red) }),
+        VColorData({ XMFLOAT4(Colors::Green) }),
+        VColorData({ XMFLOAT4(Colors::Blue) }),
+        VColorData({ XMFLOAT4(Colors::Yellow) }),
+        VColorData({ XMFLOAT4(Colors::Cyan) }),
+        VColorData({ XMFLOAT4(Colors::Magenta) })
     };
 
     //索引表
@@ -325,26 +338,35 @@ void D3D12InitApp::BuildBoxGeometry()
         4, 3, 7
     };
 
-    vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
-    ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+    //vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
+    UINT vPosByteSize = (UINT)verticesPos.size() * sizeof(VPosData);
+    UINT vColorByteSize = (UINT)verticesColor.size() * sizeof(VColorData);
+    UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
 
     //mBoxGeo = std::make_unique<MeshGeometry>();
     //mBoxGeo->Name = "boxGeo";
 
-    ThrowIfFailed(D3DCreateBlob(vbByteSize, &vertexBufferCpu));
-    CopyMemory(vertexBufferCpu->GetBufferPointer(), vertices.data(), vbByteSize);
+    //ThrowIfFailed(D3DCreateBlob(vbByteSize, &vertexBufferCpu));
+    //CopyMemory(vertexBufferCpu->GetBufferPointer(), vertices.data(), vbByteSize);
+    ThrowIfFailed(D3DCreateBlob(vPosByteSize, &vPosBufferCpu));
+    CopyMemory(vPosBufferCpu->GetBufferPointer(), verticesPos.data(), vPosByteSize);
+    ThrowIfFailed(D3DCreateBlob(vColorByteSize, &vColorBufferCpu));
+    CopyMemory(vColorBufferCpu->GetBufferPointer(), verticesColor.data(), vColorByteSize);
 
     ThrowIfFailed(D3DCreateBlob(ibByteSize, &indexBufferCpu));
     CopyMemory(indexBufferCpu->GetBufferPointer(), indices.data(), ibByteSize);
 
-    vertexBufferGpu = ToolFunc::CreateDefaultBuffer(md3dDevice.Get(),
-        mCommandList.Get(), vertices.data(), vbByteSize, vertexBufferUploader);
+    vPosBufferGpu = ToolFunc::CreateDefaultBuffer(md3dDevice.Get(),
+        mCommandList.Get(), verticesPos.data(), vPosByteSize, vPosBufferUploader);
+    vColorBufferGpu = ToolFunc::CreateDefaultBuffer(md3dDevice.Get(),
+        mCommandList.Get(), verticesColor.data(), vColorByteSize, vColorBufferUploader);
 
     indexBufferGpu = ToolFunc::CreateDefaultBuffer(md3dDevice.Get(),
         mCommandList.Get(), indices.data(), ibByteSize, indexBufferUploader);
 
-    VertexByteStride = sizeof(Vertex);
-    VertexBufferByteSize = vbByteSize;
+    //VertexByteStride = sizeof(Vertex);
+    vPosBufferByteSize = vPosByteSize;
+    vColorBufferByteSize = vColorByteSize;
     IndexFormat = DXGI_FORMAT_R16_UINT;
     IndexBufferByteSize = ibByteSize;
 
@@ -382,13 +404,35 @@ void D3D12InitApp::BuildPSO()
     ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPSO)));
 }
 
-D3D12_VERTEX_BUFFER_VIEW D3D12InitApp::GetVbv() const
+//D3D12_VERTEX_BUFFER_VIEW D3D12InitApp::GetVbv() const
+//{
+//    //将顶点数据绑定至渲染流水线
+//    D3D12_VERTEX_BUFFER_VIEW vbv;
+//    vbv.BufferLocation = vertexBufferGpu->GetGPUVirtualAddress();	//顶点缓冲区（默认堆）资源虚拟地址
+//    vbv.SizeInBytes = sizeof(Vertex) * 8;							//顶点缓冲区大小
+//    vbv.StrideInBytes = sizeof(Vertex);								//每个顶点占用的字节数
+//    //设置顶点缓冲区
+//    return vbv;
+//}
+
+D3D12_VERTEX_BUFFER_VIEW D3D12InitApp::GetVPosBufferView() const
 {
     //将顶点数据绑定至渲染流水线
     D3D12_VERTEX_BUFFER_VIEW vbv;
-    vbv.BufferLocation = vertexBufferGpu->GetGPUVirtualAddress();	//顶点缓冲区（默认堆）资源虚拟地址
-    vbv.SizeInBytes = sizeof(Vertex) * 8;							//顶点缓冲区大小
-    vbv.StrideInBytes = sizeof(Vertex);								//每个顶点占用的字节数
+    vbv.BufferLocation = vPosBufferGpu->GetGPUVirtualAddress();	//顶点缓冲区（默认堆）资源虚拟地址
+    vbv.SizeInBytes = sizeof(VPosData) * 8;							//顶点缓冲区大小
+    vbv.StrideInBytes = sizeof(VPosData);								//每个顶点占用的字节数
+    //设置顶点缓冲区
+    return vbv;
+}
+
+D3D12_VERTEX_BUFFER_VIEW D3D12InitApp::GetVColorBufferView() const
+{
+    //将顶点数据绑定至渲染流水线
+    D3D12_VERTEX_BUFFER_VIEW vbv;
+    vbv.BufferLocation = vColorBufferGpu->GetGPUVirtualAddress();	//顶点缓冲区（默认堆）资源虚拟地址
+    vbv.SizeInBytes = sizeof(VColorData) * 8;							//顶点缓冲区大小
+    vbv.StrideInBytes = sizeof(VColorData);								//每个顶点占用的字节数
     //设置顶点缓冲区
     return vbv;
 }
@@ -398,6 +442,6 @@ D3D12_INDEX_BUFFER_VIEW D3D12InitApp::GetIbv() const
     D3D12_INDEX_BUFFER_VIEW ibv;
     ibv.BufferLocation = indexBufferGpu->GetGPUVirtualAddress();
     ibv.Format = DXGI_FORMAT_R16_UINT;
-    ibv.SizeInBytes = ibByteSize;
+    ibv.SizeInBytes = IndexBufferByteSize;
     return ibv;
 }
