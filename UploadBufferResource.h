@@ -5,14 +5,15 @@ template<typename T>
 class UploadBufferResource
 {
 public:
-	UploadBufferResource(ComPtr<ID3D12Device> d3dDevice, UINT elementCount, bool isConstantBuffer)
+	UploadBufferResource(ID3D12Device* d3dDevice, UINT elementCount, bool isConstantBuffer)
 	{
 		elementByteSize = sizeof(T);//#如果不是常量缓冲区，则直接计算缓存大小
 
 		if (isConstantBuffer)
 			elementByteSize = ToolFunc::CalcConstantBufferByteSize(sizeof(T));//#如果是常量缓冲区，则以256的倍数计算缓存大小
 		//#创建上传堆和资源
-		ThrowIfFailed(d3dDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		ThrowIfFailed(d3dDevice->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 			D3D12_HEAP_FLAG_NONE,
 			&CD3DX12_RESOURCE_DESC::Buffer(elementByteSize * elementCount),
 			D3D12_RESOURCE_STATE_GENERIC_READ,
@@ -37,9 +38,9 @@ public:
 		memcpy(&mappedData[elementIndex * elementByteSize], &Data, sizeof(T));
 	}
 
-	ComPtr<ID3D12Resource> Resource()const
+	ID3D12Resource* Resource()const
 	{
-		return uploadBuffer;
+		return uploadBuffer.Get();
 	}
 
 private:
