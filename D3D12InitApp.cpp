@@ -124,7 +124,7 @@ void D3D12InitApp::Draw(const GameTime& gt)
 
     mCommandList->IASetVertexBuffers(0, 1, &GetVbv());
     mCommandList->IASetIndexBuffer(&GetIbv());
-    mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+    mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINESTRIP);
 
     mCommandList->SetGraphicsRootDescriptorTable(0, mCbvHeap->GetGPUDescriptorHandleForHeapStart());
 
