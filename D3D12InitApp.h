@@ -11,7 +11,7 @@ using namespace DirectX::PackedVector;
 struct Vertex
 {
     XMFLOAT3 Pos;
-    XMFLOAT4 Color;
+    XMCOLOR Color;
 };
 
 //常量缓冲区结构体
