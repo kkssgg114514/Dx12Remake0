@@ -30,6 +30,9 @@
     <ClInclude Include="UploadBufferResource.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="ProceduralGeometry.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="GameTime.cpp">
@@ -42,6 +45,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="D3D12InitApp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="ProceduralGeometry.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

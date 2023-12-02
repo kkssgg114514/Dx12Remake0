@@ -11,7 +11,7 @@ using namespace DirectX::PackedVector;
 struct Vertex
 {
     XMFLOAT3 Pos;
-    XMFLOAT4 Color;
+    XMCOLOR Color;
 };
 
 //常量缓冲区结构体
@@ -49,7 +49,7 @@ private:
     void BuildConstantBuffers();
     void BuildRootSignature();
     void BuildShadersAndInputLayout();
-    void BuildBoxGeometry();
+    void BuildGeometry();
     void BuildPSO();
 
     D3D12_VERTEX_BUFFER_VIEW GetVbv()const;
@@ -84,9 +84,6 @@ private:
 
     POINT mLastMousePos;
 
-    UINT vbByteSize = 0;
-    UINT ibByteSize = 0;
-
     ComPtr<ID3D12Resource> vertexBufferUploader;
     ComPtr<ID3D12Resource> indexBufferUploader;
 
@@ -97,12 +94,18 @@ private:
     ComPtr<ID3DBlob> vertexBufferCpu;
     ComPtr<ID3DBlob> indexBufferCpu;
 
-    UINT VertexByteStride = 0;
+
     UINT VertexBufferByteSize = 0;
-    DXGI_FORMAT IndexFormat = DXGI_FORMAT_R16_UINT;
     UINT IndexBufferByteSize = 0;
 
-    UINT IndexCount = 0;
-    UINT StartIndexLocation = 0;
-    INT BaseVertexLocation = 0;
+    //绘制子物体需要的三个属性
+    struct SubmeshGeometry
+    {
+        UINT indexCount;
+        UINT startIndexLocation;
+        UINT baseVertexLocation;
+    };
+
+    std::unordered_map<std::string, SubmeshGeometry> DrawArgs;
+
 };
