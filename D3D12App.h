@@ -112,7 +112,7 @@ protected:
     //首先创建工厂指针（Factory接口）
     Microsoft::WRL::ComPtr<IDXGIFactory4> mdxgiFactory;
     //然后创建设备指针
-    Microsoft::WRL::ComPtr<ID3D12Device> md3dDevice;
+    Microsoft::WRL::ComPtr<ID3D12Device> d3dDevice;
 
     //3创建围栏
     //创建围栏指针
@@ -126,7 +126,7 @@ protected:
     //CBV_SRV_UAV（常量缓冲区描述符、着色器资源缓冲描述符和随机访问缓冲描述符）
     UINT mRtvDescriptorSize = 0;
     UINT mDsvDescriptorSize = 0;
-    UINT mCbvSrvUavDescriptorSize = 0;
+    UINT cbv_srv_uavDescriptorSize = 0;
 
     //5设置MSAA抗锯齿属性
      //设置MSAA抗锯齿等级，默认不使用MSAA
@@ -136,7 +136,7 @@ protected:
     //6创建命令队列、命令列表、命令分配器
     Microsoft::WRL::ComPtr<ID3D12CommandQueue> mCommandQueue;
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> mDirectCmdListAlloc;
-    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> mCommandList;
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList;
 
     //7创建交换链
    //创建交换链指针

@@ -38,7 +38,7 @@ bool D3D12InitApp::Initialize()
         return false;
 
     // Reset the command list to prep for initialization commands.
-    ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
+    ThrowIfFailed(cmdList->Reset(mDirectCmdListAlloc.Get(), nullptr));
 
     BuildDescriptorHeaps();
     BuildConstantBuffers();
@@ -48,8 +48,8 @@ bool D3D12InitApp::Initialize()
     BuildPSO();
 
     // Execute the initialization commands.
-    ThrowIfFailed(mCommandList->Close());
-    ID3D12CommandList* cmdsLists[] = { mCommandList.Get() };
+    ThrowIfFailed(cmdList->Close());
+    ID3D12CommandList* cmdsLists[] = { cmdList.Get() };
     mCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
     // Wait until initialization is complete.
@@ -69,27 +69,34 @@ void D3D12InitApp::OnResize()
 
 void D3D12InitApp::Update(const GameTime& gt)
 {
-    // Convert Spherical to Cartesian coordinates.
+    ObjectConstants objConstants;
+    PassConstants passConstants;
+    ////构建观察矩阵
     float x = mRadius * sinf(mPhi) * cosf(mTheta);
     float z = mRadius * sinf(mPhi) * sinf(mTheta);
     float y = mRadius * cosf(mPhi);
 
-    // Build the view matrix.
+    //构建观察矩阵
     XMVECTOR pos = XMVectorSet(x, y, z, 1.0f);
     XMVECTOR target = XMVectorZero();
     XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-
     XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
     XMStoreFloat4x4(&mView, view);
 
+    //构建世界矩阵
     XMMATRIX world = XMLoadFloat4x4(&mWorld);
+    world *= XMMatrixTranslation(2.0f, 0.0f, 0.0f);//x方向偏移2单位，检查是否输入成功
+   // 构建投影矩阵
     XMMATRIX proj = XMLoadFloat4x4(&mProj);
-    XMMATRIX worldViewProj = world * view * proj;
+    //构建变换矩阵，SRT矩阵
+    XMMATRIX VP_Matrix = view * proj;
+    XMStoreFloat4x4(&passConstants.viewProj, XMMatrixTranspose(VP_Matrix));
+    passCB->CopyData(0, passConstants);
 
-    // Update the constant buffer with the latest worldViewProj matrix.
-    ObjectConstants objConstants;
-    XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
-    mObjectCB->CopyData(0, objConstants);
+
+    XMStoreFloat4x4(&objConstants.world, XMMatrixTranspose(world));
+    //将数据拷贝至GPU缓存
+    objCB->CopyData(0, objConstants);
 }
 
 void D3D12InitApp::Draw(const GameTime& gt)
@@ -100,47 +107,59 @@ void D3D12InitApp::Draw(const GameTime& gt)
 
     // A command list can be reset after it has been added to the command queue via ExecuteCommandList.
     // Reusing the command list reuses memory.
-    ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), mPSO.Get()));
+    ThrowIfFailed(cmdList->Reset(mDirectCmdListAlloc.Get(), mPSO.Get()));
 
-    mCommandList->RSSetViewports(1, &mScreenViewport);
-    mCommandList->RSSetScissorRects(1, &mScissorRect);
+    cmdList->RSSetViewports(1, &mScreenViewport);
+    cmdList->RSSetScissorRects(1, &mScissorRect);
 
     // Indicate a state transition on the resource usage.
-    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+    cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
         D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
     // Clear the back buffer and depth buffer.
-    mCommandList->ClearRenderTargetView(CurrentBackBufferView(), Colors::LightSteelBlue, 0, nullptr);
-    mCommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+    cmdList->ClearRenderTargetView(CurrentBackBufferView(), Colors::LightSteelBlue, 0, nullptr);
+    cmdList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
     // Specify the buffers we are going to render to.
-    mCommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true,
+    cmdList->OMSetRenderTargets(1, &CurrentBackBufferView(), true,
         &DepthStencilView());
 
-    ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvHeap.Get() };
-    mCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+    ID3D12DescriptorHeap* descriptorHeaps[] = { cbvHeap.Get() };
+    cmdList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-    mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
+    cmdList->SetGraphicsRootSignature(mRootSignature.Get());
 
-    mCommandList->IASetVertexBuffers(0, 1, &GetVbv());
-    mCommandList->IASetIndexBuffer(&GetIbv());
-    mCommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdList->IASetVertexBuffers(0, 1, &GetVbv());
+    cmdList->IASetIndexBuffer(&GetIbv());
+    cmdList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    mCommandList->SetGraphicsRootDescriptorTable(0, mCbvHeap->GetGPUDescriptorHandleForHeapStart());
+    //设置根描述符表
+    int objCBVIndex = 0;
+    auto handle = CD3DX12_GPU_DESCRIPTOR_HANDLE(cbvHeap->GetGPUDescriptorHandleForHeapStart());
+    handle.Offset(objCBVIndex, cbv_srv_uavDescriptorSize);
+    cmdList->SetGraphicsRootDescriptorTable(0,  //根参数的起始索引 
+        handle);
 
-    mCommandList->DrawIndexedInstanced(
+    //设置根描述符表
+    int passCBVIndex = 1;
+    handle = CD3DX12_GPU_DESCRIPTOR_HANDLE(cbvHeap->GetGPUDescriptorHandleForHeapStart());
+    handle.Offset(passCBVIndex, cbv_srv_uavDescriptorSize);
+    cmdList->SetGraphicsRootDescriptorTable(1,  //根参数的起始索引 
+        handle);
+
+    cmdList->DrawIndexedInstanced(
         IndexCount,
         1, 0, 0, 0);
 
     // Indicate a state transition on the resource usage.
-    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+    cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
         D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
     // Done recording commands.
-    ThrowIfFailed(mCommandList->Close());
+    ThrowIfFailed(cmdList->Close());
 
     // Add the command list to the queue for execution.
-    ID3D12CommandList* cmdsLists[] = { mCommandList.Get() };
+    ID3D12CommandList* cmdsLists[] = { cmdList.Get() };
     mCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
     // swap the back and front buffers
@@ -200,56 +219,91 @@ void D3D12InitApp::OnMouseMove(WPARAM btnState, int x, int y)
 
 void D3D12InitApp::BuildDescriptorHeaps()
 {
+    //创建CBV
     D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
-    cbvHeapDesc.NumDescriptors = 1;
+    cbvHeapDesc.NumDescriptors = 2;
     cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     cbvHeapDesc.NodeMask = 0;
-    ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvHeapDesc,
-        IID_PPV_ARGS(&mCbvHeap)));
+    ThrowIfFailed(d3dDevice->CreateDescriptorHeap(&cbvHeapDesc,
+        IID_PPV_ARGS(&cbvHeap)));
 }
 
 void D3D12InitApp::BuildConstantBuffers()
 {
-    mObjectCB = std::make_unique<UploadBufferResource<ObjectConstants>>(md3dDevice.Get(), 1, true);
+    objCB = std::make_unique<UploadBufferResource<ObjectConstants>>(d3dDevice.Get(), 1, true);
 
-    UINT objCBByteSize = ToolFunc::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+    //获得常量缓冲区首地址
+    D3D12_GPU_VIRTUAL_ADDRESS objCB_Address;
+    objCB_Address = objCB->Resource()->GetGPUVirtualAddress();
+    //常量缓冲区子物体下标
+    int objCBElementIndex = 0;
+    //算出子物体在常量缓冲区中的大小
+    UINT objConstSize = ToolFunc::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+    //在基址的基础上加上物体的下标和大小相乘，获得想要的物体的地址
+    objCB_Address += objCBElementIndex * objConstSize;
 
-    D3D12_GPU_VIRTUAL_ADDRESS cbAddress = mObjectCB->Resource()->GetGPUVirtualAddress();
-    // Offset to the ith object constant buffer in the buffer.
-    int boxCBufIndex = 0;
-    cbAddress += boxCBufIndex * objCBByteSize;
+    //CBV堆中的CBV元素下标（索引）
+    int heapIndex = 0;
+    //获得CBV堆的首地址
+    auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(cbvHeap->GetCPUDescriptorHandleForHeapStart());
+    handle.Offset(heapIndex, cbv_srv_uavDescriptorSize);//CBV句柄可以直接根据偏移数量和堆大小找到位置
+    //创建CBV描述符
+    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc0;
+    cbvDesc0.BufferLocation = objCB_Address;
+    cbvDesc0.SizeInBytes = objConstSize;
 
-    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
-    cbvDesc.BufferLocation = cbAddress;
-    cbvDesc.SizeInBytes = ToolFunc::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+    //创建CBV
+    d3dDevice->CreateConstantBufferView(
+        &cbvDesc0,
+        handle);
+/*------------------------------------------------------------------------------------------------------*/
+    //创建第二个CBV
+    passCB = std::make_unique<UploadBufferResource<PassConstants>>(d3dDevice.Get(), 1, true);
+    //获得常量缓冲区首地址
+    D3D12_GPU_VIRTUAL_ADDRESS passCB_Address;
+    passCB_Address = passCB->Resource()->GetGPUVirtualAddress();
+    int passCBElementIndex = 0;
+    UINT passConstSize = ToolFunc::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+    passCB_Address += passCBElementIndex * passConstSize;
+    heapIndex = 1;
+    handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(cbvHeap->GetCPUDescriptorHandleForHeapStart());
+    handle.Offset(heapIndex, cbv_srv_uavDescriptorSize);
+    //创建CBV描述符
+    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc1;
+    cbvDesc1.BufferLocation = passCB_Address;
+    cbvDesc1.SizeInBytes = passConstSize;
 
-    md3dDevice->CreateConstantBufferView(
-        &cbvDesc,
-        mCbvHeap->GetCPUDescriptorHandleForHeapStart());
+    d3dDevice->CreateConstantBufferView(
+        &cbvDesc1,
+        handle
+    );
 }
 
 void D3D12InitApp::BuildRootSignature()
 {
-    // Shader programs typically require resources as input (constant buffers,
-    // textures, samplers).  The root signature defines the resources the shader
-    // programs expect.  If we think of the shader programs as a function, and
-    // the input resources as function parameters, then the root signature can be
-    // thought of as defining the function signature.  
+    //根参数可以是描述符表、根描述符、根常量    
+    CD3DX12_ROOT_PARAMETER slotRootParameter[2];
 
-    // Root parameter can be a table, root descriptor or root constants.
-    CD3DX12_ROOT_PARAMETER slotRootParameter[1];
+    //创建由单个CBV所组成的描述符表
+    CD3DX12_DESCRIPTOR_RANGE cbvTable0;
+    cbvTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV,     //描述符类型
+        1,                                              //描述符数量
+        0);                                             //描述符锁绑定的寄存器槽号
+    CD3DX12_DESCRIPTOR_RANGE cbvTable1;
+    cbvTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV,     //描述符类型
+        1,                                              //描述符数量
+        1);                                             //描述符锁绑定的寄存器槽号
+    slotRootParameter[0].InitAsDescriptorTable(1, &cbvTable0);
+    slotRootParameter[1].InitAsDescriptorTable(1, &cbvTable1);
 
-    // Create a single descriptor table of CBVs.
-    CD3DX12_DESCRIPTOR_RANGE cbvTable;
-    cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
-    slotRootParameter[0].InitAsDescriptorTable(1, &cbvTable);
-
-    // A root signature is an array of root parameters.
-    CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(1, slotRootParameter, 0, nullptr,
+    //根签名由一组根参数构成
+    CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2,      //根参数的数量 
+        slotRootParameter,                          //根参数指针
+        0, nullptr,
         D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
-    // create a root signature with a single slot which points to a descriptor range consisting of a single constant buffer
+    //用单个寄存器槽来创建一个根签名，该槽位指向一个仅含有单个常量缓冲区的描述符区域
     ComPtr<ID3DBlob> serializedRootSig = nullptr;
     ComPtr<ID3DBlob> errorBlob = nullptr;
     HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
@@ -261,7 +315,7 @@ void D3D12InitApp::BuildRootSignature()
     }
     ThrowIfFailed(hr);
 
-    ThrowIfFailed(md3dDevice->CreateRootSignature(
+    ThrowIfFailed(d3dDevice->CreateRootSignature(
         0,
         serializedRootSig->GetBufferPointer(),
         serializedRootSig->GetBufferSize(),
@@ -337,11 +391,11 @@ void D3D12InitApp::BuildBoxGeometry()
     ThrowIfFailed(D3DCreateBlob(ibByteSize, &indexBufferCpu));
     CopyMemory(indexBufferCpu->GetBufferPointer(), indices.data(), ibByteSize);
 
-    vertexBufferGpu = ToolFunc::CreateDefaultBuffer(md3dDevice.Get(),
-        mCommandList.Get(), vertices.data(), vbByteSize, vertexBufferUploader);
+    vertexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(),
+        cmdList.Get(), vertices.data(), vbByteSize, vertexBufferUploader);
 
-    indexBufferGpu = ToolFunc::CreateDefaultBuffer(md3dDevice.Get(),
-        mCommandList.Get(), indices.data(), ibByteSize, indexBufferUploader);
+    indexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(),
+        cmdList.Get(), indices.data(), ibByteSize, indexBufferUploader);
 
     VertexByteStride = sizeof(Vertex);
     VertexBufferByteSize = vbByteSize;
@@ -379,7 +433,7 @@ void D3D12InitApp::BuildPSO()
     psoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
     psoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
     psoDesc.DSVFormat = mDepthStencilFormat;
-    ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPSO)));
+    ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPSO)));
 }
 
 D3D12_VERTEX_BUFFER_VIEW D3D12InitApp::GetVbv() const

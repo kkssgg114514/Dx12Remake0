@@ -17,7 +17,13 @@ struct Vertex
 //常量缓冲区结构体
 struct ObjectConstants
 {
-    XMFLOAT4X4 WorldViewProj = MathHelper::Identity4x4();
+    XMFLOAT4X4 world = MathHelper::Identity4x4();
+};
+
+//多常量缓冲区
+struct PassConstants
+{
+    XMFLOAT4X4 viewProj = MathHelper::Identity4x4();
 };
 
 class D3D12InitApp : public D3D12App
@@ -52,9 +58,11 @@ private:
 private:
 
     ComPtr<ID3D12RootSignature> mRootSignature = nullptr;
-    ComPtr<ID3D12DescriptorHeap> mCbvHeap = nullptr;
+    ComPtr<ID3D12DescriptorHeap> cbvHeap = nullptr;
 
-    std::unique_ptr<UploadBufferResource<ObjectConstants>> mObjectCB = nullptr;
+    std::unique_ptr<UploadBufferResource<ObjectConstants>> objCB = nullptr;
+    //两个上传堆
+    std::unique_ptr<UploadBufferResource<PassConstants>> passCB = nullptr;
 
     //std::unique_ptr<MeshGeometry> mBoxGeo = nullptr;
 
