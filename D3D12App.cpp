@@ -544,7 +544,8 @@ void D3D12App::CreateDSV()
 void D3D12App::CreateViewPortAndScissorRect()
 {
 	// Update the viewport transform to cover the client area.
-	mScreenViewport.TopLeftX = 0;
+	//前四个确定了图形绘制的范围
+	mScreenViewport.TopLeftX = -320;
 	mScreenViewport.TopLeftY = 0;
 	mScreenViewport.Width = static_cast<float>(mClientWidth);
 	mScreenViewport.Height = static_cast<float>(mClientHeight);
