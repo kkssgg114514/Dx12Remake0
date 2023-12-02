@@ -1,6 +1,6 @@
 #pragma once
 #include "D3D12App.h"
-#include "../Common/MathHelper.h"
+#include "Common/MathHelper.h"
 #include "UploadBufferResource.h"
 
 using Microsoft::WRL::ComPtr;
