@@ -89,6 +89,7 @@ void D3D12InitApp::Update(const GameTime& gt)
     // Update the constant buffer with the latest worldViewProj matrix.
     ObjectConstants objConstants;
     XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
+    objConstants.gTime = gt.TotalTime();
     mObjectCB->CopyData(0, objConstants);
 }
 
