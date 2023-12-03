@@ -401,22 +401,22 @@ void D3D12InitApp::BuildGeometry()
     for (size_t i = 0; i < box.Vertices.size(); i++, k++)
     {
         vertices[k].Pos = box.Vertices[i].Position;
-        vertices[k].Color = XMCOLOR(DirectX::Colors::Yellow);
+        vertices[k].Color = XMFLOAT4(DirectX::Colors::Blue);
     }
     for (size_t i = 0; i < grid.Vertices.size(); i++, k++)
     {
         vertices[k].Pos = grid.Vertices[i].Position;
-        vertices[k].Color = XMCOLOR(DirectX::Colors::Brown);
+        vertices[k].Color = XMFLOAT4(DirectX::Colors::Red);
     }
     for (size_t i = 0; i < sphere.Vertices.size(); i++, k++)
     {
         vertices[k].Pos = sphere.Vertices[i].Position;
-        vertices[k].Color = XMCOLOR(DirectX::Colors::Green);
+        vertices[k].Color = XMFLOAT4(DirectX::Colors::Yellow);
     }
     for (size_t i = 0; i < cylinder.Vertices.size(); i++, k++)
     {
         vertices[k].Pos = cylinder.Vertices[i].Position;
-        vertices[k].Color = XMCOLOR(DirectX::Colors::Blue);
+        vertices[k].Color = XMFLOAT4(DirectX::Colors::Green);
     }
 
     //创建总索引缓存

@@ -9,7 +9,7 @@ using namespace DirectX;
 struct Vertex
 {
     XMFLOAT3 Pos;
-    XMCOLOR Color;
+    XMFLOAT4 Color;
 };
 
 //常量缓冲区结构体
