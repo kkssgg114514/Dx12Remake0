@@ -116,8 +116,8 @@ protected:
 
     //3创建围栏
     //创建围栏指针
-    Microsoft::WRL::ComPtr<ID3D12Fence> mFence;
-    UINT64 mCurrentFence = 0;
+    Microsoft::WRL::ComPtr<ID3D12Fence> fence;
+    UINT64 currentFence = 0;
 
     //4获取描述符大小
     //要获取三个描述符大小，分别是
@@ -134,7 +134,7 @@ protected:
     UINT      m4xMsaaQuality = 0;
 
     //6创建命令队列、命令列表、命令分配器
-    Microsoft::WRL::ComPtr<ID3D12CommandQueue> mCommandQueue;
+    Microsoft::WRL::ComPtr<ID3D12CommandQueue> cmdQueue;
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> cmdAllocator;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList;
 

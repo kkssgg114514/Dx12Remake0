@@ -391,7 +391,7 @@ void D3D12App::CreateDevice()
 void D3D12App::CreateFence()
 {
 	ThrowIfFailed(d3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE,
-		IID_PPV_ARGS(&mFence)));
+		IID_PPV_ARGS(&fence)));
 }
 
 void D3D12App::GetDescriptorSize()
@@ -426,7 +426,7 @@ void D3D12App::CreateCommandObjects()
 	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	ThrowIfFailed(d3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&mCommandQueue)));
+	ThrowIfFailed(d3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&cmdQueue)));
 
 	ThrowIfFailed(d3dDevice->CreateCommandAllocator(
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -469,7 +469,7 @@ void D3D12App::CreateSwapChain()
 
 	// Note: Swap chain uses queue to perform flush.
 	ThrowIfFailed(mdxgiFactory->CreateSwapChain(
-		mCommandQueue.Get(),
+		cmdQueue.Get(),
 		&sd,
 		mSwapChain.GetAddressOf()));
 }
@@ -535,7 +535,7 @@ void D3D12App::CreateDSV()
 	// Execute the resize commands.
 	ThrowIfFailed(cmdList->Close());
 	ID3D12CommandList* cmdsLists[] = { cmdList.Get() };
-	mCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
+	cmdQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
 	// Wait until resize is complete.
 	FlushCommandQueue();
@@ -557,20 +557,20 @@ void D3D12App::CreateViewPortAndScissorRect()
 void D3D12App::FlushCommandQueue()
 {
 	// Advance the fence value to mark commands up to this fence point.
-	mCurrentFence++;
+	currentFence++;
 
 	// Add an instruction to the command queue to set a new fence point.  Because we 
 	// are on the GPU timeline, the new fence point won't be set until the GPU finishes
 	// processing all the commands prior to this Signal().
-	ThrowIfFailed(mCommandQueue->Signal(mFence.Get(), mCurrentFence));
+	ThrowIfFailed(cmdQueue->Signal(fence.Get(), currentFence));
 
 	// Wait until the GPU has completed commands up to this fence point.
-	if (mFence->GetCompletedValue() < mCurrentFence)
+	if (fence->GetCompletedValue() < currentFence)
 	{
 		HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
 
 		// Fire event when GPU hits current fence.  
-		ThrowIfFailed(mFence->SetEventOnCompletion(mCurrentFence, eventHandle));
+		ThrowIfFailed(fence->SetEventOnCompletion(currentFence, eventHandle));
 
 		// Wait until the GPU hits current fence event is fired.
 		WaitForSingleObject(eventHandle, INFINITE);

@@ -2,29 +2,13 @@
 #include "D3D12App.h"
 #include "../Common/MathHelper.h"
 #include "UploadBufferResource.h"
+#include "FrameResource.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
 
-//定义顶点结构体
-struct Vertex
-{
-    XMFLOAT3 Pos;
-    XMCOLOR Color;
-};
-
-//常量缓冲区结构体
-struct ObjectConstants
-{
-    XMFLOAT4X4 world = MathHelper::Identity4x4();
-};
-
-//多常量缓冲区
-struct PassConstants
-{
-    XMFLOAT4X4 viewProj = MathHelper::Identity4x4();
-};
+const int gNumFrameResources = 3;
 
 //构造渲染项
 struct RenderItem
@@ -33,6 +17,9 @@ struct RenderItem
 
     //该几何体的世界矩阵
     XMFLOAT4X4 world = MathHelper::Identity4x4();
+
+    //帧资源
+    int NumFramesDirty = gNumFrameResources;
 
     //该几何体的常量数据在常量缓冲区的索引
     UINT objCBIndex = -1;
@@ -75,6 +62,8 @@ private:
     void BuildRenderItem();
     void DrawRenderItems();
 
+    void BuildFrameResources();
+
     D3D12_VERTEX_BUFFER_VIEW GetVbv()const;
     D3D12_INDEX_BUFFER_VIEW GetIbv()const;
 
@@ -83,11 +72,15 @@ private:
     ComPtr<ID3D12RootSignature> mRootSignature = nullptr;
     ComPtr<ID3D12DescriptorHeap> cbvHeap = nullptr;
 
-    std::unique_ptr<UploadBufferResource<ObjectConstants>> objCB = nullptr;
-    //两个上传堆
-    std::unique_ptr<UploadBufferResource<PassConstants>> passCB = nullptr;
+    int frameResourcesCount = 3;
+    std::vector<std::unique_ptr<FrameResource>> FrameResourcesArray;
+    FrameResource* currFrameResource = nullptr;
+    int currFrameResourceIndex = 0;
 
-    //std::unique_ptr<MeshGeometry> mBoxGeo = nullptr;
+    //std::unique_ptr<UploadBufferResource<ObjectConstants>> objCB = nullptr;
+    ////两个上传堆
+    //std::unique_ptr<UploadBufferResource<PassConstants>> passCB = nullptr;
+
     std::vector<std::unique_ptr<RenderItem>> allRitems;
 
     ComPtr<ID3DBlob> mvsByteCode = nullptr;

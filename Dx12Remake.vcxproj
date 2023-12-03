@@ -139,6 +139,7 @@
   <ItemGroup>
     <ClInclude Include="D3D12App.h" />
     <ClInclude Include="D3D12InitApp.h" />
+    <ClInclude Include="FrameResource.h" />
     <ClInclude Include="GameTime.h" />
     <ClInclude Include="ProceduralGeometry.h" />
     <ClInclude Include="ToolFunc.h" />
@@ -147,6 +148,7 @@
   <ItemGroup>
     <ClCompile Include="D3D12App.cpp" />
     <ClCompile Include="D3D12InitApp.cpp" />
+    <ClCompile Include="FrameResource.cpp" />
     <ClCompile Include="GameTime.cpp" />
     <ClCompile Include="ProceduralGeometry.cpp" />
     <ClCompile Include="ToolFunc.cpp" />
