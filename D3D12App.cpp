@@ -145,12 +145,12 @@ void D3D12App::OnResize()
 {
 	assert(d3dDevice);
 	assert(mSwapChain);
-	assert(mDirectCmdListAlloc);
+	assert(cmdAllocator);
 
 	//改变资源前先同步
 	FlushCommandQueue();
 
-	ThrowIfFailed(cmdList->Reset(mDirectCmdListAlloc.Get(), nullptr));
+	ThrowIfFailed(cmdList->Reset(cmdAllocator.Get(), nullptr));
 
 	//释放之前的资源，为我们重新创建做好准备
 	for (int i = 0; i < SwapChainBufferCount; ++i)
@@ -430,12 +430,12 @@ void D3D12App::CreateCommandObjects()
 
 	ThrowIfFailed(d3dDevice->CreateCommandAllocator(
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		IID_PPV_ARGS(mDirectCmdListAlloc.GetAddressOf())));
+		IID_PPV_ARGS(cmdAllocator.GetAddressOf())));
 
 	ThrowIfFailed(d3dDevice->CreateCommandList(
 		0,
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		mDirectCmdListAlloc.Get(), // Associated command allocator
+		cmdAllocator.Get(), // Associated command allocator
 		nullptr,                   // Initial PipelineStateObject
 		IID_PPV_ARGS(cmdList.GetAddressOf())));
 

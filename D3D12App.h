@@ -135,7 +135,7 @@ protected:
 
     //6创建命令队列、命令列表、命令分配器
     Microsoft::WRL::ComPtr<ID3D12CommandQueue> mCommandQueue;
-    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> mDirectCmdListAlloc;
+    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> cmdAllocator;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList;
 
     //7创建交换链
