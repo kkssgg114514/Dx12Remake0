@@ -105,7 +105,7 @@ protected:
     bool      mFullscreenState = false;// fullscreen enabled
 
     //GameTime类实例声明
-    GameTime mTimer;
+    GameTime gameTime;
 
     //2创建设备
     //所有指针的声明

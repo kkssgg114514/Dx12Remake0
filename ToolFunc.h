@@ -77,7 +77,60 @@ public:
 	int LineNumber = -1;
 };
 
+//绘制子物体需要的三个属性
+struct SubmeshGeometry
+{
+	UINT indexCount;
+	UINT startIndexLocation;
+	UINT baseVertexLocation;
+};
 
+struct MeshGeometry
+{
+	std::string name;
+
+	Microsoft::WRL::ComPtr<ID3DBlob> vertexBufferCpu = nullptr;		//CPU系统内存上的顶点数据
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexBufferUploader = nullptr;	//GPU上传堆中的顶点缓冲区
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexBufferGpu = nullptr;		//GPU默认堆中的顶点缓冲区
+
+	Microsoft::WRL::ComPtr<ID3DBlob> indexBufferCpu = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> indexBufferUploader = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> indexBufferGpu = nullptr;
+
+	UINT vertexBufferByteSize = 0;
+	UINT vertexByteStride = 0;
+	UINT indexBufferByteSize = 0;
+	DXGI_FORMAT indexFormat = DXGI_FORMAT_R16_UINT;
+
+	std::unordered_map<std::string, SubmeshGeometry> DrawArgs;	//无序映射表，对应三个绘制参数
+
+	D3D12_VERTEX_BUFFER_VIEW GetVbv() const
+	{
+		D3D12_VERTEX_BUFFER_VIEW vbv;
+		vbv.BufferLocation = vertexBufferGpu->GetGPUVirtualAddress();//顶点缓冲区资源虚拟地址
+		vbv.SizeInBytes = vertexBufferByteSize;	//顶点缓冲区大小（所有顶点数据大小）
+		vbv.StrideInBytes = vertexByteStride;	//每个顶点元素所占用的字节数
+
+		return vbv;
+	}
+
+	D3D12_INDEX_BUFFER_VIEW GetIbv() const
+	{
+		D3D12_INDEX_BUFFER_VIEW ibv;
+		ibv.BufferLocation = indexBufferGpu->GetGPUVirtualAddress();
+		ibv.Format = indexFormat;
+		ibv.SizeInBytes = indexBufferByteSize;
+
+		return ibv;
+	}
+
+	//等待上传堆资源传至默认堆后，释放上传堆的内存
+	void DisposeUploaders()
+	{
+		vertexBufferUploader = nullptr;
+		indexBufferUploader = nullptr;
+	}
+};
 
 #ifndef ThrowIfFailed
 #define ThrowIfFailed(x)                                              \

@@ -144,6 +144,7 @@
     <ClInclude Include="ProceduralGeometry.h" />
     <ClInclude Include="ToolFunc.h" />
     <ClInclude Include="UploadBufferResource.h" />
+    <ClInclude Include="Waves.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D3D12App.cpp" />
@@ -152,6 +153,7 @@
     <ClCompile Include="GameTime.cpp" />
     <ClCompile Include="ProceduralGeometry.cpp" />
     <ClCompile Include="ToolFunc.cpp" />
+    <ClCompile Include="Waves.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

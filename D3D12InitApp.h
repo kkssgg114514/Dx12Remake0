@@ -3,6 +3,7 @@
 #include "../Common/MathHelper.h"
 #include "UploadBufferResource.h"
 #include "FrameResource.h"
+#include "Waves.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -31,6 +32,8 @@ struct RenderItem
     UINT indexCount = 0;
     UINT startIndexLocation = 0;
     UINT baseVertexLocation = 0;
+
+    MeshGeometry* geo = nullptr;
 };
 
 class D3D12InitApp : public D3D12App
@@ -63,12 +66,11 @@ private:
     void DrawRenderItems();
 
     void BuildFrameResources();
+    void UpdateWaves(const GameTime& gt);
+    void BuildLakeIndexBuffer();
 
     //获得山峦海拔
     float GetHillsHeight(float x, float z);
-
-    D3D12_VERTEX_BUFFER_VIEW GetVbv()const;
-    D3D12_INDEX_BUFFER_VIEW GetIbv()const;
 
 private:
 
@@ -85,6 +87,13 @@ private:
     //std::unique_ptr<UploadBufferResource<PassConstants>> passCB = nullptr;
 
     std::vector<std::unique_ptr<RenderItem>> allRitems;
+
+    std::unique_ptr<Waves> waves;
+
+    RenderItem* wavesRitem = nullptr;
+
+    //绘制总表
+    std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> geometries;
 
     ComPtr<ID3DBlob> mvsByteCode = nullptr;
     ComPtr<ID3DBlob> mpsByteCode = nullptr;
@@ -118,14 +127,6 @@ private:
     UINT VertexBufferByteSize = 0;
     UINT IndexBufferByteSize = 0;
 
-    //绘制子物体需要的三个属性
-    struct SubmeshGeometry
-    {
-        UINT indexCount;
-        UINT startIndexLocation;
-        UINT baseVertexLocation;
-    };
-
-    std::unordered_map<std::string, SubmeshGeometry> DrawArgs;
+   /* std::unordered_map<std::string, SubmeshGeometry> DrawArgs;*/
 
 };

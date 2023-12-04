@@ -1,6 +1,7 @@
 #include "D3D12InitApp.h"
 #include "ProceduralGeometry.h"
 
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
     PSTR cmdLine, int showCmd)
 {
@@ -41,13 +42,16 @@ bool D3D12InitApp::Initialize()
     // Reset the command list to prep for initialization commands.
     ThrowIfFailed(cmdList->Reset(cmdAllocator.Get(), nullptr));
 
+    //初始化波浪数据
+    waves = std::make_unique<Waves>(128, 128, 1.0f, 0.03f, 4.0f, 0.2f);
  
     BuildRootSignature();
     BuildShadersAndInputLayout();
     BuildGeometry();
+    BuildLakeIndexBuffer();
     BuildRenderItem();
     BuildFrameResources();
-    BuildConstantBuffers();
+    //BuildConstantBuffers();
     BuildPSO();
 
     // Execute the initialization commands.
@@ -119,6 +123,8 @@ void D3D12InitApp::Update(const GameTime& gt)
     XMMATRIX VP_Matrix = view * proj;
     XMStoreFloat4x4(&passConstants.viewProj, XMMatrixTranspose(VP_Matrix));
     currFrameResource->passCB->CopyData(0, passConstants);
+
+    UpdateWaves(gt);
 }
 
 void D3D12InitApp::Draw(const GameTime& gt)
@@ -391,23 +397,31 @@ void D3D12InitApp::BuildGeometry()
             vertices[i].Color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
         }
     }
+
     //创建索引缓存
     std::vector<std::uint16_t> indices = grid.GetIndices16();
 
     //计算顶点缓存和索引缓存大小
+    auto geo = std::make_unique<MeshGeometry>();
+    geo->name = "landGeo";
     const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
     const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
-    VertexBufferByteSize = vbByteSize;
-    IndexBufferByteSize = ibByteSize;
+    geo->vertexBufferByteSize = vbByteSize;
+    geo->indexBufferByteSize = ibByteSize;
+    geo->vertexByteStride = sizeof(Vertex);
+    geo->indexFormat = DXGI_FORMAT_R16_UINT;
 
-    ThrowIfFailed(D3DCreateBlob(vbByteSize, &vertexBufferCpu));     //创建顶点数据内存空间
-    ThrowIfFailed(D3DCreateBlob(ibByteSize, &indexBufferCpu));
-    CopyMemory(vertexBufferCpu->GetBufferPointer(), vertices.data(), vbByteSize);
-    CopyMemory(indexBufferCpu->GetBufferPointer(), indices.data(), ibByteSize);
-    vertexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(), cmdList.Get(), vertices.data(), vbByteSize, vertexBufferUploader);
-    indexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(), cmdList.Get(), indices.data(), ibByteSize, indexBufferUploader);
+    ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->vertexBufferCpu));     //创建顶点数据内存空间
+    ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->indexBufferCpu));
+    CopyMemory(geo->vertexBufferCpu->GetBufferPointer(), vertices.data(), vbByteSize);
+    CopyMemory(geo->indexBufferCpu->GetBufferPointer(), indices.data(), ibByteSize);
+    geo->vertexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(), cmdList.Get(), vertices.data(), vbByteSize, geo->vertexBufferUploader);
+    geo->indexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(), cmdList.Get(), indices.data(), ibByteSize, geo->indexBufferUploader);
 
-    DrawArgs["grid"] = gridSubmesh;
+    //将封装好的几何体SubmeshGeometry对象赋值给无序表
+    geo->DrawArgs["landGrid"] = gridSubmesh;
+    //将山川的网格几何体入总表
+    geometries["landGeo"] = std::move(geo);
 
 #pragma endregion
     /*------------------------------------------------------------------------------------------------------*/
@@ -537,14 +551,33 @@ void D3D12InitApp::BuildPSO()
 void D3D12InitApp::BuildRenderItem()
 {
 #pragma region Hill
-    auto gridRitem = std::make_unique<RenderItem>();
-    gridRitem->world = MathHelper::Identity4x4();
-    gridRitem->objCBIndex = 0;
-    gridRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-    gridRitem->indexCount = DrawArgs["grid"].indexCount;
-    gridRitem->baseVertexLocation = DrawArgs["grid"].baseVertexLocation;
-    gridRitem->startIndexLocation = DrawArgs["grid"].startIndexLocation;
-    allRitems.push_back(std::move(gridRitem));
+    auto landRitem = std::make_unique<RenderItem>();
+    landRitem->world = MathHelper::Identity4x4();
+    landRitem->objCBIndex = 0;
+    landRitem->geo = geometries["landGeo"].get();//赋值给当前的MeshGeometry
+    landRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    landRitem->indexCount = landRitem->geo->DrawArgs["landGrid"].indexCount;
+    landRitem->baseVertexLocation = landRitem->geo->DrawArgs["landGrid"].baseVertexLocation;
+    landRitem->startIndexLocation = landRitem->geo->DrawArgs["landGrid"].startIndexLocation;
+   
+    allRitems.push_back(std::move(landRitem));
+
+#pragma endregion
+
+#pragma region Lake
+    //构建湖泊
+    auto lakeRitem = std::make_unique<RenderItem>();
+    lakeRitem->world = MathHelper::Identity4x4();
+    lakeRitem->objCBIndex = 1;//湖泊的常量数据（world矩阵）在物体常量缓冲区的索引1上
+    lakeRitem->geo = geometries["lakeGeo"].get();
+    lakeRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    lakeRitem->indexCount = lakeRitem->geo->DrawArgs["lakeGrid"].indexCount;
+    lakeRitem->baseVertexLocation = lakeRitem->geo->DrawArgs["lakeGrid"].baseVertexLocation;
+    lakeRitem->startIndexLocation = lakeRitem->geo->DrawArgs["lakeGrid"].startIndexLocation;
+
+    wavesRitem = lakeRitem.get();
+
+    allRitems.push_back(std::move(lakeRitem));//被push_back后智能指针自动释放内存
 
 #pragma endregion
 
@@ -623,7 +656,7 @@ void D3D12InitApp::DrawRenderItems()
     std::vector<RenderItem*> ritems;
     UINT objectCount = (UINT)allRitems.size();//物体总个数（包括实例）
     UINT objConstSize = ToolFunc::CalcConstantBufferByteSize(sizeof(ObjectConstants));
-    UINT passConstSize = ToolFunc::CalcConstantBufferByteSize(sizeof(PassConstants));
+    auto objCB = currFrameResource->objCB->Resource();
     /*objCBByteSize = objConstSize;
     passCBByteSize = passConstSize;*/
     //先装进普通数组中
@@ -637,8 +670,9 @@ void D3D12InitApp::DrawRenderItems()
     {
         auto ritem = ritems[i];
 
-        cmdList->IASetVertexBuffers(0, 1, &GetVbv());
-        cmdList->IASetIndexBuffer(&GetIbv());
+        //一定要消除特化
+        cmdList->IASetVertexBuffers(0, 1, &ritem->geo->GetVbv());
+        cmdList->IASetIndexBuffer(&ritem->geo->GetIbv());
         cmdList->IASetPrimitiveTopology(ritem->primitiveType);
 
         ////设置根描述符表
@@ -647,7 +681,7 @@ void D3D12InitApp::DrawRenderItems()
         //handle.Offset(objCbvIndex, cbv_srv_uavDescriptorSize);
         //cmdList->SetGraphicsRootDescriptorTable(0, handle);
         //设置根描述符
-        auto objCB = currFrameResource->objCB->Resource();
+        
         auto objCBAddress = objCB->GetGPUVirtualAddress();
         objCBAddress += ritem->objCBIndex * objConstSize;
         cmdList->SetGraphicsRootConstantBufferView(0,
@@ -669,9 +703,106 @@ void D3D12InitApp::BuildFrameResources()
         FrameResourcesArray.push_back(std::make_unique<FrameResource>(
             d3dDevice.Get(),
             1,
-            (UINT)allRitems.size()
+            (UINT)allRitems.size(),     //子物体缓冲数量
+            waves->VertexCount()        //顶点缓冲数量
             ));
     }
+}
+
+void D3D12InitApp::UpdateWaves(const GameTime& gt)
+{
+    static float t_base = 0.0f;
+    if ((gameTime.TotalTime() - t_base) >= 0.25f)
+    {
+        t_base += 0.25f;//0.25秒生成一个波浪
+        //随机生成横坐标
+        int i = MathHelper::Rand(4, waves->RowCount() - 5);
+        //随机生成纵坐标
+        int j = MathHelper::Rand(4, waves->ColumnCount() - 5);
+        //随机生成波的半径
+        float r = MathHelper::RandF(0.2f, 0.5f);
+        //使用波动方程生成波纹
+        waves->Disturb(i, j, r);
+    }
+
+    //每帧更新波浪模拟（即更新顶点坐标）
+    waves->Update(gt.DeltaTime());
+
+    //将更新的顶点坐标存入GPU上传堆中
+    auto currWavesVB = currFrameResource->WavesVB.get();
+    for (int i = 0; i < waves->VertexCount(); i++)
+    {
+        Vertex v;
+
+        v.Pos = waves->Position(i);
+        v.Color = XMFLOAT4(DirectX::Colors::Red);
+
+        currWavesVB->CopyData(i, v);
+    }
+    //赋值湖泊GPU的顶点缓存
+    wavesRitem->geo->vertexBufferGpu = currWavesVB->Resource();
+}
+
+void D3D12InitApp::BuildLakeIndexBuffer()
+{
+    //初始化索引列表
+    std::vector<std::uint16_t> indices(3 * waves->TriangleCount());
+    assert(waves->VertexCount() < 0x0000ffff);//顶点索引数大于65536就终止程序
+
+    //填充索引列表
+    int m = waves->RowCount();
+    int n = waves->ColumnCount();
+    int k = 0;
+    for (int i = 0; i < m - 1; i++)
+    {
+        for (int j = 0; j < n - 1; ++j)
+        {
+            indices[k] = i * n + j;
+            indices[k + 1] = i * n + j + 1;
+            indices[k + 2] = (i + 1) * n + j;
+
+            indices[k + 3] = (i + 1) * n + j;
+            indices[k + 4] = i * n + j + 1;
+            indices[k + 5] = (i + 1) * n + j + 1;
+
+            k += 6; // next quad
+        }
+    }
+
+    //计算顶点和索引缓存大小
+    UINT vbByteSize = waves->VertexCount() * sizeof(Vertex);
+    UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+
+    auto geo = std::make_unique<MeshGeometry>();
+    geo->name = "lakeGeo";
+
+    geo->vertexBufferCpu = nullptr;
+    geo->vertexBufferGpu = nullptr;
+
+    //创建索引的CPU内存
+    ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->indexBufferCpu));
+    //将索引表放入内存
+    CopyMemory(geo->indexBufferCpu->GetBufferPointer(), indices.data(), ibByteSize);
+    //索引数据上传至默认堆
+    geo->indexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(),
+        cmdList.Get(),
+        indices.data(),
+        ibByteSize,
+        geo->indexBufferUploader);
+
+    //赋值MeshGeometry相关属性
+    geo->vertexBufferByteSize = vbByteSize;
+    geo->vertexByteStride = sizeof(Vertex);
+    geo->indexFormat = DXGI_FORMAT_R16_UINT;
+    geo->indexBufferByteSize = ibByteSize;
+
+    SubmeshGeometry LakeSubmesh;
+    LakeSubmesh.indexCount = (UINT)indices.size();
+    LakeSubmesh.baseVertexLocation = 0;
+    LakeSubmesh.startIndexLocation = 0;
+    //使用grid几何体
+    geo->DrawArgs["lakeGrid"] = LakeSubmesh;
+    geometries["lakeGeo"] = std::move(geo);
 }
 
 float D3D12InitApp::GetHillsHeight(float x, float z)
@@ -679,22 +810,3 @@ float D3D12InitApp::GetHillsHeight(float x, float z)
     return 0.3f * (z * sinf(0.1f * x) + x * cosf(0.1f * z));
 }
 
-D3D12_VERTEX_BUFFER_VIEW D3D12InitApp::GetVbv() const
-{
-    //将顶点数据绑定至渲染流水线
-    D3D12_VERTEX_BUFFER_VIEW vbv;
-    vbv.BufferLocation = vertexBufferGpu->GetGPUVirtualAddress();	//顶点缓冲区（默认堆）资源虚拟地址
-    vbv.SizeInBytes = VertexBufferByteSize;							//顶点缓冲区大小
-    vbv.StrideInBytes = sizeof(Vertex);								//每个顶点占用的字节数
-    //设置顶点缓冲区
-    return vbv;
-}
-
-D3D12_INDEX_BUFFER_VIEW D3D12InitApp::GetIbv() const
-{
-    D3D12_INDEX_BUFFER_VIEW ibv;
-    ibv.BufferLocation = indexBufferGpu->GetGPUVirtualAddress();
-    ibv.Format = DXGI_FORMAT_R16_UINT;
-    ibv.SizeInBytes = IndexBufferByteSize;
-    return ibv;
-}

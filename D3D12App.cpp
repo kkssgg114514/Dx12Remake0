@@ -74,7 +74,7 @@ int D3D12App::Run()
 	//#定义消息结构体
 	MSG msg = { 0 };
 
-	mTimer.Reset();
+	gameTime.Reset();
 	//#如果GetMessage函数不等于0，说明没有接受到WM_QUIT
 	while (msg.message != WM_QUIT)
 	{
@@ -87,14 +87,14 @@ int D3D12App::Run()
 		// Otherwise, do animation/game stuff.
 		else
 		{
-			mTimer.Tick();//计算每两帧间隔
+			gameTime.Tick();//计算每两帧间隔
 
 			if (!mAppPaused)
 			{
 				//处于运行状态才运行游戏
 				CalculateFrameStats();
-				Update(mTimer);
-				Draw(mTimer);
+				Update(gameTime);
+				Draw(gameTime);
 			}
 			else
 			{
@@ -182,12 +182,12 @@ LRESULT D3D12App::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		if (LOWORD(wParam) == WA_INACTIVE)
 		{
 			mAppPaused = true;
-			mTimer.Stop();
+			gameTime.Stop();
 		}
 		else
 		{
 			mAppPaused = false;
-			mTimer.Start();
+			gameTime.Start();
 		}
 		return 0;
 
@@ -253,7 +253,7 @@ LRESULT D3D12App::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_ENTERSIZEMOVE:
 		mAppPaused = true;
 		mResizing = true;
-		mTimer.Stop();
+		gameTime.Stop();
 		return 0;
 
 		// WM_EXITSIZEMOVE is sent when the user releases the resize bars.
@@ -261,7 +261,7 @@ LRESULT D3D12App::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_EXITSIZEMOVE:
 		mAppPaused = false;
 		mResizing = false;
-		mTimer.Start();
+		gameTime.Start();
 		OnResize();
 		return 0;
 
@@ -608,7 +608,7 @@ void D3D12App::CalculateFrameStats()
 	frameCnt++;
 
 	// Compute averages over one second period.
-	if ((mTimer.TotalTime() - timeElapsed) >= 1.0f)
+	if ((gameTime.TotalTime() - timeElapsed) >= 1.0f)
 	{
 		float fps = (float)frameCnt; // fps = frameCnt / 1
 		float mspf = 1000.0f / fps;
