@@ -64,6 +64,9 @@ private:
 
     void BuildFrameResources();
 
+    //获得山峦海拔
+    float GetHillsHeight(float x, float z);
+
     D3D12_VERTEX_BUFFER_VIEW GetVbv()const;
     D3D12_INDEX_BUFFER_VIEW GetIbv()const;
 
@@ -97,7 +100,7 @@ private:
 
     float mTheta = 1.5f * XM_PI;
     float mPhi = XM_PIDIV4;
-    float mRadius = 5.0f;
+    float mRadius = 50.0f;
 
     POINT mLastMousePos;
 
