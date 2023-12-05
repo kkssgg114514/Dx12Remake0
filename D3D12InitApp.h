@@ -74,6 +74,7 @@ private:
 
     //œ∞Ã‚3
     void BuildSkullGeometry();
+    void BuildSkullRenderItem();
 
 private:
 

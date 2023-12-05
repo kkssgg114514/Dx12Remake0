@@ -49,6 +49,7 @@ bool D3D12InitApp::Initialize()
     BuildShadersAndInputLayout();
     BuildGeometry();
     //BuildLakeIndexBuffer();
+    BuildSkullGeometry();
     BuildRenderItem();
     BuildFrameResources();
     //BuildConstantBuffers();
@@ -664,6 +665,9 @@ void D3D12InitApp::BuildRenderItem()
         allRitems.push_back(std::move(rightSphereRitem));
     }
 #pragma endregion
+    //读取骷髅
+    BuildSkullRenderItem();
+
 }
 
 void D3D12InitApp::DrawRenderItems()
@@ -827,5 +831,95 @@ float D3D12InitApp::GetHillsHeight(float x, float z)
 
 void D3D12InitApp::BuildSkullGeometry()
 {
+    std::ifstream fin("Models/skull.txt");//读取骷髅文件
+
+    if (!fin)
+    {
+        MessageBox(0, L"文件读取失败", 0, 0);
+        return;
+    }
+
+    UINT vertexCount = 0;
+    UINT triangleCount = 0;
+
+    std::string ignore;
+
+    //分别忽略第一个空格前的字符串，读取后半段的数字，是顶点数和三角形数
+    fin >> ignore >> vertexCount;
+    fin >> ignore >> triangleCount;
+    //整行不读
+    fin >> ignore >> ignore >> ignore >> ignore;
+
+    //初始化顶点列表
+    std::vector<Vertex> vertices(vertexCount);//初始化顶点列表
+    //顶点列表赋值
+    for (UINT i = 0; i < vertexCount; i++)
+    {
+        //读取顶点坐标
+        fin >> vertices[i].Pos.x >> vertices[i].Pos.y >> vertices[i].Pos.z;
+        //normal数据忽略
+        fin >> ignore >> ignore >> ignore;
+        vertices[i].Color = XMFLOAT4(DirectX::Colors::Black);
+    }
+
+    fin >> ignore;
+    fin >> ignore;
+    fin >> ignore;
+
+    //初始化索引列表
+    std::vector<std::uint32_t> indices(triangleCount * 3);
+    //索引列表赋值
+    for (UINT i = 0; i < triangleCount; i++)
+    {
+        fin >> indices[i * 3 + 0] >> indices[i * 3 + 1] >> indices[i * 3 + 2];
+    }
+
+    //关闭输入流
+    fin.close();
+
+    const UINT vbByteSize = vertices.size() * sizeof(Vertex);
+    const UINT ibByteSize = indices.size() * sizeof(std::int32_t);
+
+    auto geo = std::make_unique<MeshGeometry>();
+    geo->name = "skullGeo";
+
+    //顶点和索引数据放入CPU和GPU
+    
+
+    ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->vertexBufferCpu));	//创建顶点数据内存空间
+    ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->indexBufferCpu));	//创建索引数据内存空间
+    CopyMemory(geo->vertexBufferCpu->GetBufferPointer(), vertices.data(), vbByteSize);	//将顶点数据拷贝至顶点系统内存中
+    CopyMemory(geo->indexBufferCpu->GetBufferPointer(), indices.data(), ibByteSize);	//将索引数据拷贝至索引系统内存中
+    geo->vertexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(), cmdList.Get(), vertices.data(), vbByteSize, geo->vertexBufferUploader);
+    geo->indexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(), cmdList.Get(), indices.data(), ibByteSize, geo->indexBufferUploader);
+
+    geo->vertexBufferByteSize = vbByteSize;
+    geo->indexBufferByteSize = ibByteSize;
+    geo->vertexByteStride = sizeof(Vertex);
+    geo->indexFormat = DXGI_FORMAT_R32_UINT;
+
+    //绘制三参数
+    SubmeshGeometry skullSubmesh;
+    skullSubmesh.indexCount = (UINT)indices.size();
+    skullSubmesh.baseVertexLocation = 0;
+    skullSubmesh.startIndexLocation = 0;
+
+    geo->DrawArgs["skull"] = skullSubmesh;
+
+    geometries["skullGeo"] = std::move(geo);
+
+}
+
+void D3D12InitApp::BuildSkullRenderItem()
+{
+    auto skullRitem = std::make_unique<RenderItem>();
+    XMStoreFloat4x4(&skullRitem->world, XMMatrixScaling(0.5f, 0.5f, 0.5f) * XMMatrixTranslation(0.0f, 1.0f, 0.0f));
+    skullRitem->objCBIndex = 2;
+    skullRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    skullRitem->geo = geometries["skullGeo"].get();
+    skullRitem->indexCount = skullRitem->geo->DrawArgs["skull"].indexCount;
+    skullRitem->baseVertexLocation = skullRitem->geo->DrawArgs["skull"].baseVertexLocation;
+    skullRitem->startIndexLocation = skullRitem->geo->DrawArgs["skull"].startIndexLocation;
+    allRitems.push_back(std::move(skullRitem));
 }
 
