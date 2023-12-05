@@ -604,7 +604,7 @@ void D3D12InitApp::BuildRenderItem()
     //auto gridRitem = std::make_unique<RenderItem>();
     //gridRitem->world = MathHelper::Identity4x4();
     //gridRitem->objCBIndex = 1;//BOX常量数据（world矩阵）在objConstantBuffer索引1上
-    //gridRitem->geo = geometries["lakeGeo"].get();
+    //gridRitem->geo = geometries["ShapeGeo"].get();
     //gridRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     //gridRitem->indexCount = gridRitem->geo->DrawArgs["grid"].indexCount;
     //gridRitem->baseVertexLocation = gridRitem->geo->DrawArgs["grid"].baseVertexLocation;
@@ -628,6 +628,7 @@ void D3D12InitApp::BuildRenderItem()
     //    XMStoreFloat4x4(&(leftCylinderRitem->world), leftCylWorld);
     //    //此处的索引随着循环不断加1（注意：这里是先赋值再++）
     //    leftCylinderRitem->objCBIndex = fllowObjCBIndex++;
+    //    rightCylinderRitem->geo = geometries["ShapeGeo"].get();
     //    leftCylinderRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     //    leftCylinderRitem->indexCount = leftCylinderRitem->geo->DrawArgs["cylinder"].indexCount;
     //    leftCylinderRitem->baseVertexLocation = leftCylinderRitem->geo->DrawArgs["cylinder"].baseVertexLocation;
@@ -635,7 +636,7 @@ void D3D12InitApp::BuildRenderItem()
     //    //右边5个圆柱
     //    XMStoreFloat4x4(&(rightCylinderRitem->world), rightCylWorld);
     //    rightCylinderRitem->objCBIndex = fllowObjCBIndex++;
-    //    rightCylinderRitem->geo = geometries["lakeGeo"].get();
+    //    rightCylinderRitem->geo = geometries["ShapeGeo"].get();
     //    rightCylinderRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     //    rightCylinderRitem->indexCount = rightCylinderRitem->geo->DrawArgs["cylinder"].indexCount;
     //    rightCylinderRitem->baseVertexLocation = rightCylinderRitem->geo->DrawArgs["cylinder"].baseVertexLocation;
@@ -643,7 +644,7 @@ void D3D12InitApp::BuildRenderItem()
     //    //左边5个球
     //    XMStoreFloat4x4(&(leftSphereRitem->world), leftSphereWorld);
     //    leftSphereRitem->objCBIndex = fllowObjCBIndex++;
-    //    leftSphereRitem->geo = geometries["lakeGeo"].get();
+    //    leftSphereRitem->geo = geometries["ShapeGeo"].get();
     //    leftSphereRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     //    leftSphereRitem->indexCount = leftSphereRitem->geo->DrawArgs["sphere"].indexCount;
     //    leftSphereRitem->baseVertexLocation = leftSphereRitem->geo->DrawArgs["sphere"].baseVertexLocation;
@@ -651,7 +652,7 @@ void D3D12InitApp::BuildRenderItem()
     //    //右边5个球
     //    XMStoreFloat4x4(&(rightSphereRitem->world), rightSphereWorld);
     //    rightSphereRitem->objCBIndex = fllowObjCBIndex++;
-    //    rightSphereRitem->geo = geometries["lakeGeo"].get();
+    //    rightSphereRitem->geo = geometries["ShapeGeo"].get();
     //    rightSphereRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     //    rightSphereRitem->indexCount = rightSphereRitem->geo->DrawArgs["sphere"].indexCount;
     //    rightSphereRitem->baseVertexLocation = rightSphereRitem->geo->DrawArgs["sphere"].baseVertexLocation;
