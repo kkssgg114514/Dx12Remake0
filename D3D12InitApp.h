@@ -72,6 +72,9 @@ private:
     //获得山峦海拔
     float GetHillsHeight(float x, float z);
 
+    //习题3
+    void BuildSkullGeometry();
+
 private:
 
     ComPtr<ID3D12RootSignature> mRootSignature = nullptr;
