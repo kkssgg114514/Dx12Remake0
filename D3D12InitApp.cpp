@@ -49,7 +49,9 @@ bool D3D12InitApp::Initialize()
     BuildShadersAndInputLayout();
     BuildGeometry();
     BuildLakeIndexBuffer();
-    BuildSkullGeometry();
+    //BuildSkullGeometry();
+    BuildMaterials();
+    BuildRenderItem();
     BuildRenderItem();
     BuildFrameResources();
     //BuildConstantBuffers();
@@ -77,6 +79,8 @@ void D3D12InitApp::OnResize()
 
 void D3D12InitApp::Update(const GameTime& gt)
 {
+    OnKeyboardInput(gt);
+
     currFrameResourceIndex = (currFrameResourceIndex + 1) % frameResourcesCount;
     currFrameResource = FrameResourcesArray[currFrameResourceIndex].get();
 
@@ -90,7 +94,7 @@ void D3D12InitApp::Update(const GameTime& gt)
     }
 
     UpdateObjCBs();
-    UpdatePassCBs();
+    UpdatePassCBs(gt);
     UpdateMatCBs();
     UpdateWaves(gt);
 }
@@ -210,6 +214,30 @@ void D3D12InitApp::OnMouseMove(WPARAM btnState, int x, int y)
     mLastMousePos.y = y;
 }
 
+void D3D12InitApp::OnKeyboardInput(const GameTime& gt)
+{
+    const float dt = gt.DeltaTime();
+    if (GetAsyncKeyState(VK_LEFT) & 0x8000)
+    {
+        sunTheta -= 1.0f * dt;
+    }
+    if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
+    {
+        sunTheta += 1.0f * dt;
+    }
+    if (GetAsyncKeyState(VK_UP) & 0x8000)
+    {
+        sunPhi -= 1.0f * dt;
+    }
+    if (GetAsyncKeyState(VK_DOWN) & 0x8000)
+    {
+        sunPhi += 1.0f * dt;
+    }
+    //将Phi约束在[0, PI/2]之间
+    sunPhi = MathHelper::Clamp(sunPhi, 0.1f, XM_PIDIV2);
+
+}
+
 void D3D12InitApp::BuildConstantBuffers()
 {
     ////创建CBV堆
@@ -315,13 +343,13 @@ void D3D12InitApp::BuildShadersAndInputLayout()
 {
     HRESULT hr = S_OK;
 
-    mvsByteCode = ToolFunc::CompileShader(L"Shaders\\color.hlsl", nullptr, "VS", "vs_5_0");
-    mpsByteCode = ToolFunc::CompileShader(L"Shaders\\color.hlsl", nullptr, "PS", "ps_5_0");
+    mvsByteCode = ToolFunc::CompileShader(L"Shaders\\shade.hlsl", nullptr, "VS", "vs_5_0");
+    mpsByteCode = ToolFunc::CompileShader(L"Shaders\\shade.hlsl", nullptr, "PS", "ps_5_0");
 
     mInputLayout =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
     };
 }
 
@@ -345,27 +373,28 @@ void D3D12InitApp::BuildGeometry()
         vertices[i].Pos = grid.Vertices.at(i).Position;
         vertices[i].Pos.y = GetHillsHeight(vertices.at(i).Pos.x, vertices.at(i).Pos.z);
 
-        //颜色是RGBA
-        if (vertices.at(i).Pos.y < -10.0f)
-        {
-            vertices[i].Color = XMFLOAT4(1.0f, 0.96f, 0.62f, 1.0f);
-        }
-        else if (vertices[i].Pos.y < 5.0f)
-        {
-            vertices[i].Color = XMFLOAT4(0.48f, 0.77f, 0.46f, 1.0f);
-        }
-        else if (vertices[i].Pos.y < 12.0f)
-        {
-            vertices[i].Color = XMFLOAT4(0.1f, 0.48f, 0.19f, 1.0f);
-        }
-        else if (vertices[i].Pos.y < 20.0f)
-        {
-            vertices[i].Color = XMFLOAT4(0.45f, 0.39f, 0.34f, 1.0f);
-        }
-        else
-        {
-            vertices[i].Color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-        }
+        vertices[i].Normal = GetHillsNormal(vertices.at(i).Pos.x, vertices.at(i).Pos.z);
+        ////颜色是RGBA
+        //if (vertices.at(i).Pos.y < -10.0f)
+        //{
+        //    vertices[i].Color = XMFLOAT4(1.0f, 0.96f, 0.62f, 1.0f);
+        //}
+        //else if (vertices[i].Pos.y < 5.0f)
+        //{
+        //    vertices[i].Color = XMFLOAT4(0.48f, 0.77f, 0.46f, 1.0f);
+        //}
+        //else if (vertices[i].Pos.y < 12.0f)
+        //{
+        //    vertices[i].Color = XMFLOAT4(0.1f, 0.48f, 0.19f, 1.0f);
+        //}
+        //else if (vertices[i].Pos.y < 20.0f)
+        //{
+        //    vertices[i].Color = XMFLOAT4(0.45f, 0.39f, 0.34f, 1.0f);
+        //}
+        //else
+        //{
+        //    vertices[i].Color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+        //}
     }
 
     //创建索引缓存
@@ -392,6 +421,7 @@ void D3D12InitApp::BuildGeometry()
     geo->DrawArgs["landGrid"] = gridSubmesh;
     //将山川的网格几何体入总表
     geometries["landGeo"] = std::move(geo);
+
 
 #pragma endregion
     /*------------------------------------------------------------------------------------------------------*/
@@ -514,7 +544,7 @@ void D3D12InitApp::BuildPSO()
         mpsByteCode->GetBufferSize()
     };
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+    //psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
     psoDesc.SampleMask = UINT_MAX;
@@ -556,6 +586,7 @@ void D3D12InitApp::BuildRenderItem()
     auto landRitem = std::make_unique<RenderItem>();
     landRitem->world = MathHelper::Identity4x4();
     landRitem->objCBIndex = 0;
+    landRitem->mat = materials["grass"].get();
     landRitem->geo = geometries["landGeo"].get();//赋值给当前的MeshGeometry
     landRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     landRitem->indexCount = landRitem->geo->DrawArgs["landGrid"].indexCount;
@@ -571,6 +602,7 @@ void D3D12InitApp::BuildRenderItem()
     auto lakeRitem = std::make_unique<RenderItem>();
     lakeRitem->world = MathHelper::Identity4x4();
     lakeRitem->objCBIndex = 1;//湖泊的常量数据（world矩阵）在物体常量缓冲区的索引1上
+    lakeRitem->mat = materials["water"].get();
     lakeRitem->geo = geometries["lakeGeo"].get();
     lakeRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     lakeRitem->indexCount = lakeRitem->geo->DrawArgs["lakeGrid"].indexCount;
@@ -657,8 +689,8 @@ void D3D12InitApp::BuildRenderItem()
     //    allRitems.push_back(std::move(rightSphereRitem));
     //}
 #pragma endregion
-    //读取骷髅
-    BuildSkullRenderItem();
+    ////读取骷髅
+    //BuildSkullRenderItem();
 }
 
 void D3D12InitApp::DrawRenderItems()
@@ -733,7 +765,7 @@ void D3D12InitApp::UpdateObjCBs()
     }
 }
 
-void D3D12InitApp::UpdatePassCBs()
+void D3D12InitApp::UpdatePassCBs(const GameTime& gt)
 {
     PassConstants passConstants;
 
@@ -743,6 +775,7 @@ void D3D12InitApp::UpdatePassCBs()
     float y = mRadius * cosf(mPhi);
 
     //构建观察矩阵
+    passConstants.eyePosW = XMFLOAT3(x, y, z);
     XMVECTOR pos = XMVectorSet(x, y, z, 10.0f);
     XMVECTOR target = XMVectorZero();
     XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
@@ -757,7 +790,11 @@ void D3D12InitApp::UpdatePassCBs()
 
     passConstants.ambientLight = { 0.25f,0.25f,0.35f,1.0f };
     passConstants.lights[0].strength = { 1.0f,1.0f,0.9f };
-    passConstants.lights[0].direction = { 0.0f,0.0f,0.0f };
+    passConstants.totalTime = gt.TotalTime();
+
+    //球坐标转换成笛卡尔坐标
+    XMVECTOR sunDir = -MathHelper::SphericalToCartesian(1.0f, sunTheta, sunPhi);
+    XMStoreFloat3(&passConstants.lights[0].direction, sunDir);
 
     currFrameResource->passCB->CopyData(0, passConstants);
 }
@@ -770,6 +807,7 @@ void D3D12InitApp::BuildFrameResources()
             d3dDevice.Get(),
             1,
             (UINT)allRitems.size(),     //子物体缓冲数量
+            (UINT)materials.size(),     //材质数量
             waves->VertexCount()        //顶点缓冲数量
             ));
     }
@@ -801,7 +839,8 @@ void D3D12InitApp::UpdateWaves(const GameTime& gt)
         Vertex v;
 
         v.Pos = waves->Position(i);
-        v.Color = XMFLOAT4(DirectX::Colors::Red);
+        v.Normal = waves->Normal(i);
+        //v.Color = XMFLOAT4(DirectX::Colors::Red);
 
         currWavesVB->CopyData(i, v);
     }
@@ -871,6 +910,17 @@ void D3D12InitApp::BuildLakeIndexBuffer()
     geometries["lakeGeo"] = std::move(geo);
 }
 
+XMFLOAT3 D3D12InitApp::GetHillsNormal(float x, float z) const
+{
+    XMFLOAT3 normal = XMFLOAT3(-0.03f * z * cosf(0.1f * x) - cosf(0.1f * z),
+        1.0f,
+        -0.3f * sinf(0.1f * x) + 0.1f * x * sinf(0.1f * z));
+    XMVECTOR unitNormal = XMVector3Normalize(XMLoadFloat3(&normal));
+    XMStoreFloat3(&normal, unitNormal);
+
+    return normal;
+}
+
 void D3D12InitApp::UpdateMatCBs()
 {
     //在Update函数中执行
@@ -926,8 +976,8 @@ void D3D12InitApp::BuildSkullGeometry()
             //读取顶点坐标
             fin >> vertices[i].Pos.x >> vertices[i].Pos.y >> vertices[i].Pos.z;
             //normal数据忽略
-            fin >> ignore >> ignore >> ignore;
-            vertices[i].Color = XMFLOAT4(DirectX::Colors::Black);
+            fin >> vertices[i].Normal.x >> vertices[i].Normal.y >> vertices[i].Normal.z;
+            //vertices[i].Color = XMFLOAT4(DirectX::Colors::Black);
         }
 
         fin >> ignore;

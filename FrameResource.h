@@ -9,7 +9,7 @@ using namespace DirectX;
 struct Vertex
 {
     XMFLOAT3 Pos;
-    XMFLOAT4 Color;
+    XMFLOAT3 Normal;
 };
 
 //常量缓冲区结构体
@@ -23,6 +23,8 @@ struct PassConstants
 {
     XMFLOAT4X4 viewProj = MathHelper::Identity4x4();
 
+    XMFLOAT3 eyePosW = { 0.0f,0.0f,0.0f };
+    float totalTime = 0.0f;
     XMFLOAT4 ambientLight = { 0.0f,0.0f,0.0f,1.0f };
     Light lights[MAX_LIGHTS];
 };

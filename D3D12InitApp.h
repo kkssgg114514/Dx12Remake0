@@ -55,6 +55,7 @@ private:
     virtual void OnMouseDown(WPARAM btnState, int x, int y)override;
     virtual void OnMouseUp(WPARAM btnState, int x, int y)override;
     virtual void OnMouseMove(WPARAM btnState, int x, int y)override;
+    void OnKeyboardInput(const GameTime& gt);
 
 
     void BuildConstantBuffers();
@@ -69,13 +70,14 @@ private:
     void DrawRenderItems();
 
     void UpdateObjCBs();
-    void UpdatePassCBs();
+    void UpdatePassCBs(const GameTime& gt);
+    void UpdateMatCBs();
 
     void BuildFrameResources();
     void UpdateWaves(const GameTime& gt);
     void BuildLakeIndexBuffer();
-
-    void UpdateMatCBs();
+    XMFLOAT3 GetHillsNormal(float x, float z)const;
+ 
 
     //获得山峦海拔
     float GetHillsHeight(float x, float z);
@@ -126,7 +128,7 @@ private:
 
     POINT mLastMousePos;
 
-    ComPtr<ID3D12Resource> vertexBufferUploader;
+    /*ComPtr<ID3D12Resource> vertexBufferUploader;
     ComPtr<ID3D12Resource> indexBufferUploader;
 
     ComPtr<ID3D12Resource> vertexBufferGpu;
@@ -134,8 +136,10 @@ private:
 
 
     ComPtr<ID3DBlob> vertexBufferCpu;
-    ComPtr<ID3DBlob> indexBufferCpu;
-
+    ComPtr<ID3DBlob> indexBufferCpu;*/
+    //太阳（平行光）位置的球坐标
+    float sunTheta = 1.25f * XM_PI;
+    float sunPhi = XM_PIDIV4;
 
     UINT VertexBufferByteSize = 0;
     UINT IndexBufferByteSize = 0;
