@@ -77,6 +77,29 @@ public:
 	int LineNumber = -1;
 };
 
+//最大灯光数量
+#define MAX_LIGHTS 16
+struct Light
+{
+	XMFLOAT3 strength = { 0.5f,0.5f,0.5f };		//光源颜色（）
+	float falloffStart = 1.0f;					//点光源和聚光灯的开始衰减距离
+	XMFLOAT3 direction = { 0.0f,-1.0f,0.0f };	//方向光和聚光灯的方向向量
+	float falloffEnd = 10.0f;					//点光源和聚光灯的衰减结束距离
+	XMFLOAT3 position = { 0.0f,0.0f,0.0f };		//点光和聚光灯的坐标
+	float spotPower = 64.0f;					//聚光灯因子中的参数
+};
+
+//材质
+struct Material
+{
+	std::string name;
+	int matCBIndex = -1;
+	int numFrameDirty = 3;//已更新标志，表示材质有变化，需要更新常量缓冲区
+	XMFLOAT4 diffuseAlbedo = { 1.0f,1.0f,1.0f,1.0f };	//材质反照率
+	XMFLOAT3 fresnelR0 = { 0.01f,0.01f,0.01f };			//RF（0）值，材质的反射属性
+	float roughness = 0.25f;							//材质粗糙度
+};
+
 //绘制子物体需要的三个属性
 struct SubmeshGeometry
 {

@@ -89,42 +89,9 @@ void D3D12InitApp::Update(const GameTime& gt)
         CloseHandle;
     }
 
-    
-    ////构建观察矩阵
-    float x = mRadius * sinf(mPhi) * cosf(mTheta);
-    float z = mRadius * sinf(mPhi) * sinf(mTheta);
-    float y = mRadius * cosf(mPhi);
-
-    //构建观察矩阵
-    XMVECTOR pos = XMVectorSet(x, y, z, 10.0f);
-    XMVECTOR target = XMVectorZero();
-    XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-    XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
-    XMStoreFloat4x4(&mView, view);
-
-    ObjectConstants objConstants;
-    PassConstants passConstants;
-    //构建世界矩阵
-    for (auto& e : allRitems)
-    {
-        if (e->NumFramesDirty > 0)
-        {
-            mWorld = e->world;
-            XMMATRIX w = XMLoadFloat4x4(&mWorld);
-            //转赋值
-            XMStoreFloat4x4(&objConstants.world, XMMatrixTranspose(w));
-            currFrameResource->objCB->CopyData(e->objCBIndex, objConstants);
-
-            e->NumFramesDirty--;
-        }
-    }
-   // 构建投影矩阵
-    XMMATRIX proj = XMLoadFloat4x4(&mProj);
-    //构建变换矩阵，SRT矩阵
-    XMMATRIX VP_Matrix = view * proj;
-    XMStoreFloat4x4(&passConstants.viewProj, XMMatrixTranspose(VP_Matrix));
-    currFrameResource->passCB->CopyData(0, passConstants);
-
+    UpdateObjCBs();
+    UpdatePassCBs();
+    UpdateMatCBs();
     UpdateWaves(gt);
 }
 
@@ -169,12 +136,13 @@ void D3D12InitApp::Draw(const GameTime& gt)
     //passCbvHandle.Offset(passCBVIndex, cbv_srv_uavDescriptorSize);
     //cmdList->SetGraphicsRootDescriptorTable(1,  //根参数的起始索引 
     //    passCbvHandle);
+   
+    DrawRenderItems();
+    
     //设置passCB描述符
     auto passCB = currFrameResource->passCB->Resource();
-    cmdList->SetGraphicsRootConstantBufferView(1,
+    cmdList->SetGraphicsRootConstantBufferView(2,
         passCB->GetGPUVirtualAddress());
-
-    DrawRenderItems();
 
     // Indicate a state transition on the resource usage.
     cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
@@ -313,12 +281,13 @@ void D3D12InitApp::BuildConstantBuffers()
 void D3D12InitApp::BuildRootSignature()
 {
     //根参数可以是描述符表、根描述符、根常量    
-    CD3DX12_ROOT_PARAMETER slotRootParameter[2];
+    CD3DX12_ROOT_PARAMETER slotRootParameter[3];
     slotRootParameter[0].InitAsConstantBufferView(0);
     slotRootParameter[1].InitAsConstantBufferView(1);
+    slotRootParameter[2].InitAsConstantBufferView(2);
 
     //根签名由一组根参数构成
-    CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2,      //根参数的数量 
+    CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(3,      //根参数的数量 
         slotRootParameter,                          //根参数指针
         0, nullptr,
         D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -558,6 +527,29 @@ void D3D12InitApp::BuildPSO()
     ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPSO)));
 }
 
+void D3D12InitApp::BuildMaterials()
+{
+    //用无序映射表封装
+    //定义陆地的材质
+    auto grass = std::make_unique<Material>();
+    grass->name = "grass";
+    grass->matCBIndex = 0;
+    grass->diffuseAlbedo = XMFLOAT4(0.2f, 0.6f, 0.2f, 1.0f);    //陆地反照率（颜色）
+    grass->fresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);           //陆地的R0
+    grass->roughness = 0.125f;                                  //陆地的粗糙度（归一化后的）
+
+    //定义湖水的材质
+    auto water = std::make_unique<Material>();
+    water->name = "water";
+    water->matCBIndex = 1;
+    water->diffuseAlbedo = XMFLOAT4(0.0f, 0.2f, 0.6f, 1.0f);    //湖水的反射率
+    water->fresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
+    water->roughness = 0.0f;
+
+    materials["grass"] = std::move(grass);
+    materials["water"] = std::move(water);
+}
+
 void D3D12InitApp::BuildRenderItem()
 {
 #pragma region Hill
@@ -674,6 +666,7 @@ void D3D12InitApp::DrawRenderItems()
     std::vector<RenderItem*> ritems;
     UINT objectCount = (UINT)allRitems.size();//物体总个数（包括实例）
     UINT objConstSize = ToolFunc::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+    UINT matConstantSize = ToolFunc::CalcConstantBufferByteSize(sizeof(MatConstants));
     auto objCB = currFrameResource->objCB->Resource();
     /*objCBByteSize = objConstSize;
     passCBByteSize = passConstSize;*/
@@ -698,12 +691,19 @@ void D3D12InitApp::DrawRenderItems()
         //auto handle = CD3DX12_GPU_DESCRIPTOR_HANDLE(cbvHeap->GetGPUDescriptorHandleForHeapStart());
         //handle.Offset(objCbvIndex, cbv_srv_uavDescriptorSize);
         //cmdList->SetGraphicsRootDescriptorTable(0, handle);
-        //设置根描述符
         
+        //设置根描述符
         auto objCBAddress = objCB->GetGPUVirtualAddress();
         objCBAddress += ritem->objCBIndex * objConstSize;
         cmdList->SetGraphicsRootConstantBufferView(0,
             objCBAddress);
+
+        //设置根描述符，将根描述符与matCB资源绑定
+        auto matCB = currFrameResource->matCB->Resource();
+        auto matCBAddress = matCB->GetGPUVirtualAddress();
+        matCBAddress += ritem->mat->matCBIndex * matConstantSize;
+        cmdList->SetGraphicsRootConstantBufferView(1,
+            matCBAddress);
 
         //绘制顶点
         cmdList->DrawIndexedInstanced(ritem->indexCount,    //每个实例绘制的索引数量
@@ -712,6 +712,54 @@ void D3D12InitApp::DrawRenderItems()
             ritem->baseVertexLocation,                      //子物体起始索引在全局索引中的位置
             0);                                             //实例化的高级技术
     }
+}
+
+void D3D12InitApp::UpdateObjCBs()
+{
+    ObjectConstants objConstants;
+    //构建世界矩阵
+    for (auto& e : allRitems)
+    {
+        if (e->NumFramesDirty > 0)
+        {
+            mWorld = e->world;
+            XMMATRIX w = XMLoadFloat4x4(&mWorld);
+            //转赋值
+            XMStoreFloat4x4(&objConstants.world, XMMatrixTranspose(w));
+            currFrameResource->objCB->CopyData(e->objCBIndex, objConstants);
+
+            e->NumFramesDirty--;
+        }
+    }
+}
+
+void D3D12InitApp::UpdatePassCBs()
+{
+    PassConstants passConstants;
+
+    ////构建观察矩阵
+    float x = mRadius * sinf(mPhi) * cosf(mTheta);
+    float z = mRadius * sinf(mPhi) * sinf(mTheta);
+    float y = mRadius * cosf(mPhi);
+
+    //构建观察矩阵
+    XMVECTOR pos = XMVectorSet(x, y, z, 10.0f);
+    XMVECTOR target = XMVectorZero();
+    XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
+    XMStoreFloat4x4(&mView, view);
+
+    // 构建投影矩阵
+    XMMATRIX proj = XMLoadFloat4x4(&mProj);
+    //构建变换矩阵，SRT矩阵
+    XMMATRIX VP_Matrix = view * proj;
+    XMStoreFloat4x4(&passConstants.viewProj, XMMatrixTranspose(VP_Matrix));
+
+    passConstants.ambientLight = { 0.25f,0.25f,0.35f,1.0f };
+    passConstants.lights[0].strength = { 1.0f,1.0f,0.9f };
+    passConstants.lights[0].direction = { 0.0f,0.0f,0.0f };
+
+    currFrameResource->passCB->CopyData(0, passConstants);
 }
 
 void D3D12InitApp::BuildFrameResources()
@@ -821,6 +869,26 @@ void D3D12InitApp::BuildLakeIndexBuffer()
     //使用grid几何体
     geo->DrawArgs["lakeGrid"] = LakeSubmesh;
     geometries["lakeGeo"] = std::move(geo);
+}
+
+void D3D12InitApp::UpdateMatCBs()
+{
+    //在Update函数中执行
+    for (auto& e : materials)
+    {
+        Material* mat = e.second.get();
+        if (mat->numFrameDirty > 0)
+        {
+            MatConstants matConstants;
+            matConstants.diffuseAlbedo = mat->diffuseAlbedo;
+            matConstants.fresnelR0 = mat->fresnelR0;
+            matConstants.roughness = mat->roughness;
+            //将材质常量数据复制到常量缓冲区对应索引地址处
+            currFrameResource->matCB->CopyData(mat->matCBIndex, matConstants);
+            //更新下一个帧资源
+            mat->numFrameDirty--;
+        }
+    }
 }
 
 float D3D12InitApp::GetHillsHeight(float x, float z)

@@ -33,6 +33,7 @@ struct RenderItem
     UINT startIndexLocation = 0;
     UINT baseVertexLocation = 0;
 
+    Material* mat = nullptr;
     MeshGeometry* geo = nullptr;
 };
 
@@ -62,12 +63,19 @@ private:
     void BuildGeometry();
     void BuildPSO();
 
+    void BuildMaterials();
+
     void BuildRenderItem();
     void DrawRenderItems();
+
+    void UpdateObjCBs();
+    void UpdatePassCBs();
 
     void BuildFrameResources();
     void UpdateWaves(const GameTime& gt);
     void BuildLakeIndexBuffer();
+
+    void UpdateMatCBs();
 
     //获得山峦海拔
     float GetHillsHeight(float x, float z);
@@ -88,6 +96,8 @@ private:
     //std::unique_ptr<UploadBufferResource<ObjectConstants>> objCB = nullptr;
     ////两个上传堆
     //std::unique_ptr<UploadBufferResource<PassConstants>> passCB = nullptr;
+
+    std::unordered_map<std::string, std::unique_ptr<Material>> materials;
 
     std::vector<std::unique_ptr<RenderItem>> allRitems;
 
