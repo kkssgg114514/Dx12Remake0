@@ -82,6 +82,7 @@ void D3D12InitApp::Update(const GameTime& gt)
     OnKeyboardInput(gt);
 
     currFrameResourceIndex = (currFrameResourceIndex + 1) % frameResourcesCount;
+    //首次初始化
     currFrameResource = FrameResourcesArray[currFrameResourceIndex].get();
 
     //如果GPU端围栏值小于CPU端围栏值，即CPU速度快于GPU，则令CPU等待
@@ -572,7 +573,7 @@ void D3D12InitApp::BuildMaterials()
     auto water = std::make_unique<Material>();
     water->name = "water";
     water->matCBIndex = 1;
-    water->diffuseAlbedo = XMFLOAT4(0.0f, 0.2f, 0.6f, 1.0f);    //湖水的反射率
+    water->diffuseAlbedo = XMFLOAT4(0.5f, 0.0f, 0.2f, 1.0f);    //湖水的反射率
     water->fresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
     water->roughness = 0.0f;
 
