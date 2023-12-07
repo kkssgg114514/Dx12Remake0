@@ -1078,7 +1078,7 @@ void D3D12InitApp::BuildSkullRenderItem()
 {
     auto skullRitem = std::make_unique<RenderItem>();
     XMStoreFloat4x4(&skullRitem->world, XMMatrixScaling(0.5f, 0.5f, 0.5f) * XMMatrixTranslation(0.0f, 1.0f, 0.0f));
-    skullRitem->objCBIndex = 2;
+    skullRitem->objCBIndex = 22;
     skullRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     skullRitem->mat = materials["skullMat"].get();
     skullRitem->geo = geometries["skullGeo"].get();
