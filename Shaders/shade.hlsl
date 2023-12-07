@@ -71,7 +71,7 @@ float4 PS(VertexOut pin) : SV_Target
     Material mat = { gDiffuseAlbedo, gFresnelR0, gRoughness };
     float3 shadowFactor = 1.0f;//暂时使用1.0，不对计算产生影响
     //直接光照
-    float4 directLight = float4(ComputerLighting(gLights, mat, pin.WorldPos, worldNormal, worldView, shadowFactor), 0.0f);
+    float4 directLight = ComputerLighting(gLights, mat, pin.WorldPos, worldNormal, worldView, shadowFactor);
     //环境光照
     float4 ambient = gAmbientLight * gDiffuseAlbedo;
     

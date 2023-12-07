@@ -141,13 +141,13 @@ void D3D12InitApp::Draw(const GameTime& gt)
     //cmdList->SetGraphicsRootDescriptorTable(1,  //根参数的起始索引 
     //    passCbvHandle);
    
-    DrawRenderItems();
-    
     //设置passCB描述符
     auto passCB = currFrameResource->passCB->Resource();
     cmdList->SetGraphicsRootConstantBufferView(2,
         passCB->GetGPUVirtualAddress());
 
+    DrawRenderItems();
+    
     // Indicate a state transition on the resource usage.
     cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
         D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -700,6 +700,7 @@ void D3D12InitApp::DrawRenderItems()
     UINT objConstSize = ToolFunc::CalcConstantBufferByteSize(sizeof(ObjectConstants));
     UINT matConstantSize = ToolFunc::CalcConstantBufferByteSize(sizeof(MatConstants));
     auto objCB = currFrameResource->objCB->Resource();
+    auto matCB = currFrameResource->matCB->Resource();
     /*objCBByteSize = objConstSize;
     passCBByteSize = passConstSize;*/
     //先装进普通数组中
@@ -731,7 +732,6 @@ void D3D12InitApp::DrawRenderItems()
             objCBAddress);
 
         //设置根描述符，将根描述符与matCB资源绑定
-        auto matCB = currFrameResource->matCB->Resource();
         auto matCBAddress = matCB->GetGPUVirtualAddress();
         matCBAddress += ritem->mat->matCBIndex * matConstantSize;
         cmdList->SetGraphicsRootConstantBufferView(1,
@@ -767,6 +767,9 @@ void D3D12InitApp::UpdateObjCBs()
 
 void D3D12InitApp::UpdatePassCBs(const GameTime& gt)
 {
+    // 构建投影矩阵
+    XMMATRIX proj = XMLoadFloat4x4(&mProj);
+
     PassConstants passConstants;
 
     ////构建观察矩阵
@@ -782,8 +785,6 @@ void D3D12InitApp::UpdatePassCBs(const GameTime& gt)
     XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
     XMStoreFloat4x4(&mView, view);
 
-    // 构建投影矩阵
-    XMMATRIX proj = XMLoadFloat4x4(&mProj);
     //构建变换矩阵，SRT矩阵
     XMMATRIX VP_Matrix = view * proj;
     XMStoreFloat4x4(&passConstants.viewProj, XMMatrixTranspose(VP_Matrix));

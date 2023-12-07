@@ -26,20 +26,20 @@ float CalcAttenuation(float d, float falloffEnd, float falloffStart)
 float3 SchlickFresnel(float3 R0, float3 normal, float3 lightVector)
 {
     //根据石里克方程计算出入射光线被反射的百分比
-    float3 reflectPercent = R0 + (1.0f - R0) * pow(1 - saturate(dot(normal, lightVector)), 5.0f);
+    float3 reflectPercent = R0 + (1.0f - R0) * pow(1.0f - saturate(dot(normal, lightVector)), 5.0f);
     return reflectPercent;
 }
 
 float3 BlinnPhong(Material mat, float3 normal, float3 toEye, 
                    float3 lightVec, float3 lightStrength)
 {
-    float m = (1.0f - mat.roughness) * 256.0f; //粗糙度因子里的m值
+    const float m = (1.0f - mat.roughness) * 256.0f; //粗糙度因子里的m值
     float3 halfVec = normalize(lightVec + toEye); //半角向量
     float roughnessFactor = (m + 8.0f) / 8.0f * pow(max(dot(normal, halfVec), 0.0f), m);//粗糙度因子
     float3 fresnelFactor = SchlickFresnel(mat.fresnelR0, halfVec, lightVec); //菲尼尔因子
     
     float3 specAlbedo = fresnelFactor * roughnessFactor;//镜面反射反照率=菲尼尔因子*粗糙度因子
-    specAlbedo = specAlbedo / (specAlbedo + 1); //将镜面反射反照率缩放到[0，1]
+    specAlbedo = specAlbedo / (specAlbedo + 1.0f); //将镜面反射反照率缩放到[0，1]
     
     float3 diff_Spec = lightStrength * (mat.diffuseAlbedo.rgb + specAlbedo); //漫反射+高光反射=入射光量*总的反照率
     return diff_Spec;//返回漫反射+高光反射
@@ -100,7 +100,7 @@ float3 ComputerSpotLight(Light light, Material mat, float3 pos, float3 normal, f
 
 #define MAX_LIGHTS 16
 
-float3 ComputerLighting(Light lights[MAX_LIGHTS], Material mat,
+float4 ComputerLighting(Light lights[MAX_LIGHTS], Material mat,
                         float3 pos, float3 normal, float3 toEye,
                         float3 shadowFactor)
 {
@@ -131,5 +131,5 @@ float3 ComputerLighting(Light lights[MAX_LIGHTS], Material mat,
     }
 #endif
   
-    return result;
+    return float4(result, 0.0f);
 }

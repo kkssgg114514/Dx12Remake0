@@ -1,6 +1,6 @@
 #pragma once
 #include "D3D12App.h"
-#include "../Common/MathHelper.h"
+#include "Common/MathHelper.h"
 #include "UploadBufferResource.h"
 #include "FrameResource.h"
 #include "Waves.h"
@@ -128,7 +128,7 @@ private:
 
     POINT mLastMousePos;
 
-    /*ComPtr<ID3D12Resource> vertexBufferUploader;
+   /* ComPtr<ID3D12Resource> vertexBufferUploader;
     ComPtr<ID3D12Resource> indexBufferUploader;
 
     ComPtr<ID3D12Resource> vertexBufferGpu;
@@ -141,8 +141,8 @@ private:
     float sunTheta = 1.25f * XM_PI;
     float sunPhi = XM_PIDIV4;
 
-    UINT VertexBufferByteSize = 0;
-    UINT IndexBufferByteSize = 0;
+    //UINT VertexBufferByteSize = 0;
+    //UINT IndexBufferByteSize = 0;
 
    /* std::unordered_map<std::string, SubmeshGeometry> DrawArgs;*/
 
