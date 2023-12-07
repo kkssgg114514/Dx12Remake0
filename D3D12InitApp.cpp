@@ -560,6 +560,7 @@ void D3D12InitApp::BuildPSO()
 
 void D3D12InitApp::BuildMaterials()
 {
+#pragma region HillsAndLake
     //用无序映射表封装
     //定义陆地的材质
     auto grass = std::make_unique<Material>();
@@ -579,6 +580,42 @@ void D3D12InitApp::BuildMaterials()
 
     materials["grass"] = std::move(grass);
     materials["water"] = std::move(water);
+#pragma endregion
+
+#pragma region Shapes
+   /* auto bricks0 = std::make_unique<Material>();
+    bricks0->name = "bricks0";
+    bricks0->matCBIndex = 0;
+    bricks0->diffuseAlbedo = XMFLOAT4(Colors::ForestGreen);
+    bricks0->fresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
+    bricks0->roughness = 0.1f;
+
+    auto stone0 = std::make_unique<Material>();
+    stone0->name = "stone0";
+    stone0->matCBIndex = 1;
+    stone0->diffuseAlbedo = XMFLOAT4(Colors::LightSteelBlue);
+    stone0->fresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
+    stone0->roughness = 0.3f;
+
+    auto tile0 = std::make_unique<Material>();
+    tile0->name = "tile0";
+    tile0->matCBIndex = 2;
+    tile0->diffuseAlbedo = XMFLOAT4(Colors::LightGray);
+    tile0->fresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
+    tile0->roughness = 0.2f;
+
+    auto skullMat = std::make_unique<Material>();
+    skullMat->name = "skullMat";
+    skullMat->matCBIndex = 3;
+    skullMat->diffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    skullMat->fresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
+    skullMat->roughness = 0.3f;
+
+    materials["bricks0"] = std::move(bricks0);
+    materials["stone0"] = std::move(stone0);
+    materials["tile0"] = std::move(tile0);
+    materials["skullMat"] = std::move(skullMat);*/
+#pragma endregion
 }
 
 void D3D12InitApp::BuildRenderItem()
@@ -617,81 +654,87 @@ void D3D12InitApp::BuildRenderItem()
 #pragma endregion
 
 #pragma region Shapes
-    //auto boxRItem = std::make_unique<RenderItem>();
-    //XMStoreFloat4x4(&(boxRItem->world), XMMatrixScaling(2.0f, 2.0f, 2.0f) * XMMatrixTranslation(0.0f, 0.5f, 0.0f));
-    //boxRItem->objCBIndex = 0;//常量数据，在0下标上
-    //boxRItem->geo = geometries["ShapeGeo"].get();
-    //boxRItem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-    //boxRItem->indexCount = boxRItem->geo->DrawArgs["box"].indexCount;
-    //boxRItem->baseVertexLocation = boxRItem->geo->DrawArgs["box"].baseVertexLocation;
-    //boxRItem->startIndexLocation = boxRItem->geo->DrawArgs["box"].startIndexLocation;
-    //allRitems.push_back(std::move(boxRItem));
-
-    //auto gridRitem = std::make_unique<RenderItem>();
-    //gridRitem->world = MathHelper::Identity4x4();
-    //gridRitem->objCBIndex = 1;//BOX常量数据（world矩阵）在objConstantBuffer索引1上
-    //gridRitem->geo = geometries["ShapeGeo"].get();
-    //gridRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-    //gridRitem->indexCount = gridRitem->geo->DrawArgs["grid"].indexCount;
-    //gridRitem->baseVertexLocation = gridRitem->geo->DrawArgs["grid"].baseVertexLocation;
-    //gridRitem->startIndexLocation = gridRitem->geo->DrawArgs["grid"].startIndexLocation;
-    //allRitems.push_back(std::move(gridRitem));
-
-    //UINT fllowObjCBIndex = 2;//接下去的几何体常量数据在CB中的索引从2开始
-    ////将圆柱和圆的实例模型存入渲染项中
-    //for (int i = 0; i < 5; i++)
-    //{
-    //    auto leftCylinderRitem = std::make_unique<RenderItem>();
-    //    auto rightCylinderRitem = std::make_unique<RenderItem>();
-    //    auto leftSphereRitem = std::make_unique<RenderItem>();
-    //    auto rightSphereRitem = std::make_unique<RenderItem>();
-
-    //    XMMATRIX leftCylWorld = XMMatrixTranslation(-5.0f, 1.5f, -10.0f + i * 5.0f);
-    //    XMMATRIX rightCylWorld = XMMatrixTranslation(+5.0f, 1.5f, -10.0f + i * 5.0f);
-    //    XMMATRIX leftSphereWorld = XMMatrixTranslation(-5.0f, 3.5f, -10.0f + i * 5.0f);
-    //    XMMATRIX rightSphereWorld = XMMatrixTranslation(+5.0f, 3.5f, -10.0f + i * 5.0f);
-    //    //左边5个圆柱
-    //    XMStoreFloat4x4(&(leftCylinderRitem->world), leftCylWorld);
-    //    //此处的索引随着循环不断加1（注意：这里是先赋值再++）
-    //    leftCylinderRitem->objCBIndex = fllowObjCBIndex++;
-    //    rightCylinderRitem->geo = geometries["ShapeGeo"].get();
-    //    leftCylinderRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-    //    leftCylinderRitem->indexCount = leftCylinderRitem->geo->DrawArgs["cylinder"].indexCount;
-    //    leftCylinderRitem->baseVertexLocation = leftCylinderRitem->geo->DrawArgs["cylinder"].baseVertexLocation;
-    //    leftCylinderRitem->startIndexLocation = leftCylinderRitem->geo->DrawArgs["cylinder"].startIndexLocation;
-    //    //右边5个圆柱
-    //    XMStoreFloat4x4(&(rightCylinderRitem->world), rightCylWorld);
-    //    rightCylinderRitem->objCBIndex = fllowObjCBIndex++;
-    //    rightCylinderRitem->geo = geometries["ShapeGeo"].get();
-    //    rightCylinderRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-    //    rightCylinderRitem->indexCount = rightCylinderRitem->geo->DrawArgs["cylinder"].indexCount;
-    //    rightCylinderRitem->baseVertexLocation = rightCylinderRitem->geo->DrawArgs["cylinder"].baseVertexLocation;
-    //    rightCylinderRitem->startIndexLocation = rightCylinderRitem->geo->DrawArgs["cylinder"].startIndexLocation;
-    //    //左边5个球
-    //    XMStoreFloat4x4(&(leftSphereRitem->world), leftSphereWorld);
-    //    leftSphereRitem->objCBIndex = fllowObjCBIndex++;
-    //    leftSphereRitem->geo = geometries["ShapeGeo"].get();
-    //    leftSphereRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-    //    leftSphereRitem->indexCount = leftSphereRitem->geo->DrawArgs["sphere"].indexCount;
-    //    leftSphereRitem->baseVertexLocation = leftSphereRitem->geo->DrawArgs["sphere"].baseVertexLocation;
-    //    leftSphereRitem->startIndexLocation = leftSphereRitem->geo->DrawArgs["sphere"].startIndexLocation;
-    //    //右边5个球
-    //    XMStoreFloat4x4(&(rightSphereRitem->world), rightSphereWorld);
-    //    rightSphereRitem->objCBIndex = fllowObjCBIndex++;
-    //    rightSphereRitem->geo = geometries["ShapeGeo"].get();
-    //    rightSphereRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-    //    rightSphereRitem->indexCount = rightSphereRitem->geo->DrawArgs["sphere"].indexCount;
-    //    rightSphereRitem->baseVertexLocation = rightSphereRitem->geo->DrawArgs["sphere"].baseVertexLocation;
-    //    rightSphereRitem->startIndexLocation = rightSphereRitem->geo->DrawArgs["sphere"].startIndexLocation;
-
-    //    allRitems.push_back(std::move(leftCylinderRitem));
-    //    allRitems.push_back(std::move(rightCylinderRitem));
-    //    allRitems.push_back(std::move(leftSphereRitem));
-    //    allRitems.push_back(std::move(rightSphereRitem));
-    //}
+//    auto boxRItem = std::make_unique<RenderItem>();
+//    XMStoreFloat4x4(&(boxRItem->world), XMMatrixScaling(2.0f, 2.0f, 2.0f) * XMMatrixTranslation(0.0f, 0.5f, 0.0f));
+//    boxRItem->objCBIndex = 0;//常量数据，在0下标上
+//    boxRItem->mat = materials["stone0"].get();
+//    boxRItem->geo = geometries["ShapeGeo"].get();
+//    boxRItem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+//    boxRItem->indexCount = boxRItem->geo->DrawArgs["box"].indexCount;
+//    boxRItem->baseVertexLocation = boxRItem->geo->DrawArgs["box"].baseVertexLocation;
+//    boxRItem->startIndexLocation = boxRItem->geo->DrawArgs["box"].startIndexLocation;
+//    allRitems.push_back(std::move(boxRItem));
+//
+//    auto gridRitem = std::make_unique<RenderItem>();
+//    gridRitem->world = MathHelper::Identity4x4();
+//    gridRitem->objCBIndex = 1;//BOX常量数据（world矩阵）在objConstantBuffer索引1上
+//    gridRitem->mat = materials["tile0"].get();
+//    gridRitem->geo = geometries["ShapeGeo"].get();
+//    gridRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+//    gridRitem->indexCount = gridRitem->geo->DrawArgs["grid"].indexCount;
+//    gridRitem->baseVertexLocation = gridRitem->geo->DrawArgs["grid"].baseVertexLocation;
+//    gridRitem->startIndexLocation = gridRitem->geo->DrawArgs["grid"].startIndexLocation;
+//    allRitems.push_back(std::move(gridRitem));
+//
+//    UINT fllowObjCBIndex = 2;//接下去的几何体常量数据在CB中的索引从2开始
+//    //将圆柱和圆的实例模型存入渲染项中
+//    for (int i = 0; i < 5; i++)
+//    {
+//        auto leftCylinderRitem = std::make_unique<RenderItem>();
+//        auto rightCylinderRitem = std::make_unique<RenderItem>();
+//        auto leftSphereRitem = std::make_unique<RenderItem>();
+//        auto rightSphereRitem = std::make_unique<RenderItem>();
+//
+//        XMMATRIX leftCylWorld = XMMatrixTranslation(-5.0f, 1.5f, -10.0f + i * 5.0f);
+//        XMMATRIX rightCylWorld = XMMatrixTranslation(+5.0f, 1.5f, -10.0f + i * 5.0f);
+//        XMMATRIX leftSphereWorld = XMMatrixTranslation(-5.0f, 3.5f, -10.0f + i * 5.0f);
+//        XMMATRIX rightSphereWorld = XMMatrixTranslation(+5.0f, 3.5f, -10.0f + i * 5.0f);
+//        //左边5个圆柱
+//        XMStoreFloat4x4(&(leftCylinderRitem->world), leftCylWorld);
+//        //此处的索引随着循环不断加1（注意：这里是先赋值再++）
+//        leftCylinderRitem->objCBIndex = fllowObjCBIndex++;
+//        leftCylinderRitem->mat = materials["bricks0"].get();
+//        leftCylinderRitem->geo = geometries["ShapeGeo"].get();
+//        leftCylinderRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+//        leftCylinderRitem->indexCount = leftCylinderRitem->geo->DrawArgs["cylinder"].indexCount;
+//        leftCylinderRitem->baseVertexLocation = leftCylinderRitem->geo->DrawArgs["cylinder"].baseVertexLocation;
+//        leftCylinderRitem->startIndexLocation = leftCylinderRitem->geo->DrawArgs["cylinder"].startIndexLocation;
+//        //右边5个圆柱
+//        XMStoreFloat4x4(&(rightCylinderRitem->world), rightCylWorld);
+//        rightCylinderRitem->objCBIndex = fllowObjCBIndex++;
+//        rightCylinderRitem->mat = materials["bricks0"].get();
+//        rightCylinderRitem->geo = geometries["ShapeGeo"].get();
+//        rightCylinderRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+//        rightCylinderRitem->indexCount = rightCylinderRitem->geo->DrawArgs["cylinder"].indexCount;
+//        rightCylinderRitem->baseVertexLocation = rightCylinderRitem->geo->DrawArgs["cylinder"].baseVertexLocation;
+//        rightCylinderRitem->startIndexLocation = rightCylinderRitem->geo->DrawArgs["cylinder"].startIndexLocation;
+//        //左边5个球
+//        XMStoreFloat4x4(&(leftSphereRitem->world), leftSphereWorld);
+//        leftSphereRitem->objCBIndex = fllowObjCBIndex++;
+//        leftSphereRitem->mat = materials["stone0"].get();
+//        leftSphereRitem->geo = geometries["ShapeGeo"].get();
+//        leftSphereRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+//        leftSphereRitem->indexCount = leftSphereRitem->geo->DrawArgs["sphere"].indexCount;
+//        leftSphereRitem->baseVertexLocation = leftSphereRitem->geo->DrawArgs["sphere"].baseVertexLocation;
+//        leftSphereRitem->startIndexLocation = leftSphereRitem->geo->DrawArgs["sphere"].startIndexLocation;
+//        //右边5个球
+//        XMStoreFloat4x4(&(rightSphereRitem->world), rightSphereWorld);
+//        rightSphereRitem->objCBIndex = fllowObjCBIndex++;
+//        rightSphereRitem->mat = materials["stone0"].get();
+//        rightSphereRitem->geo = geometries["ShapeGeo"].get();
+//        rightSphereRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+//        rightSphereRitem->indexCount = rightSphereRitem->geo->DrawArgs["sphere"].indexCount;
+//        rightSphereRitem->baseVertexLocation = rightSphereRitem->geo->DrawArgs["sphere"].baseVertexLocation;
+//        rightSphereRitem->startIndexLocation = rightSphereRitem->geo->DrawArgs["sphere"].startIndexLocation;
+//
+//        allRitems.push_back(std::move(leftCylinderRitem));
+//        allRitems.push_back(std::move(rightCylinderRitem));
+//        allRitems.push_back(std::move(leftSphereRitem));
+//        allRitems.push_back(std::move(rightSphereRitem));
+//    }
 #pragma endregion
-    ////读取骷髅
-    //BuildSkullRenderItem();
+//    //读取骷髅
+//    BuildSkullRenderItem();
 }
 
 void D3D12InitApp::DrawRenderItems()
@@ -1037,6 +1080,7 @@ void D3D12InitApp::BuildSkullRenderItem()
     XMStoreFloat4x4(&skullRitem->world, XMMatrixScaling(0.5f, 0.5f, 0.5f) * XMMatrixTranslation(0.0f, 1.0f, 0.0f));
     skullRitem->objCBIndex = 2;
     skullRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    skullRitem->mat = materials["skullMat"].get();
     skullRitem->geo = geometries["skullGeo"].get();
     skullRitem->indexCount = skullRitem->geo->DrawArgs["skull"].indexCount;
     skullRitem->baseVertexLocation = skullRitem->geo->DrawArgs["skull"].baseVertexLocation;
