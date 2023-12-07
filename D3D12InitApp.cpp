@@ -573,7 +573,7 @@ void D3D12InitApp::BuildMaterials()
     auto water = std::make_unique<Material>();
     water->name = "water";
     water->matCBIndex = 1;
-    water->diffuseAlbedo = XMFLOAT4(0.5f, 0.0f, 0.2f, 1.0f);    //湖水的反射率
+    water->diffuseAlbedo = XMFLOAT4(0.0f, 0.5f, 0.9f, 1.0f);    //湖水的反射率
     water->fresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
     water->roughness = 0.0f;
 
@@ -791,7 +791,9 @@ void D3D12InitApp::UpdatePassCBs(const GameTime& gt)
     XMStoreFloat4x4(&passConstants.viewProj, XMMatrixTranspose(VP_Matrix));
 
     passConstants.ambientLight = { 0.25f,0.25f,0.35f,1.0f };
-    passConstants.lights[0].strength = { 1.0f,1.0f,0.9f };
+
+    float value = sinf(gt.TotalTime() * 4.0f) * 0.5f + 0.5f;
+    passConstants.lights[0].strength = { value * 2.0f + 1.0f, 0.0f, 0.0f };
     passConstants.totalTime = gt.TotalTime();
 
     //球坐标转换成笛卡尔坐标
