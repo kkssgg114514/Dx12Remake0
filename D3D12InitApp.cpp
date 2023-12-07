@@ -846,7 +846,7 @@ void D3D12InitApp::UpdatePassCBs(const GameTime& gt)
         passConstants.lights[spotLightIndex].position = XMFLOAT3(-5.0f, 3.5f, -10.0f + i * 5.0f);
         passConstants.lights[spotLightIndex].strength = { 0.7f, 0.7f, 0.7f };
         passConstants.lights[spotLightIndex].direction = XMFLOAT3(0.0f, -1.2f, 0.0f);
-        passConstants.lights[spotLightIndex].spotPower = 16.0f;
+        passConstants.lights[spotLightIndex].spotPower = 1.0f;
         spotLightIndex++;
     }
     //右边5个聚光灯光源坐标和强度
@@ -855,7 +855,7 @@ void D3D12InitApp::UpdatePassCBs(const GameTime& gt)
         passConstants.lights[spotLightIndex].position = XMFLOAT3(+5.0f, 3.5f, -10.0f + i * 5.0f);
         passConstants.lights[spotLightIndex].strength = { 0.7f, 0.7f, 0.7f };
         passConstants.lights[spotLightIndex].direction = XMFLOAT3(0.0f, -1.2f, 0.0f);
-        passConstants.lights[spotLightIndex].spotPower = 16.0f;
+        passConstants.lights[spotLightIndex].spotPower = 1.0f;
         spotLightIndex++;
     }
     passConstants.totalTime = gt.TotalTime();
