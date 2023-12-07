@@ -567,7 +567,7 @@ void D3D12InitApp::BuildMaterials()
     grass->matCBIndex = 0;
     grass->diffuseAlbedo = XMFLOAT4(0.2f, 0.6f, 0.2f, 1.0f);    //陆地反照率（颜色）
     grass->fresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);           //陆地的R0
-    grass->roughness = 0.125f;                                  //陆地的粗糙度（归一化后的）
+    grass->roughness = 0.9f;                                  //陆地的粗糙度（归一化后的）
 
     //定义湖水的材质
     auto water = std::make_unique<Material>();
