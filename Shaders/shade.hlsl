@@ -85,12 +85,12 @@ float4 PS(VertexOut pin) : SV_Target
     float3 worldNormal = normalize(pin.WorldNormal);
     float3 worldView = normalize(gEyePosW - pin.WorldPos);
     
-    Material mat = { gDiffuseAlbedo, gFresnelR0, gRoughness };
+    Material mat = { diffuseAlbedo, gFresnelR0, gRoughness };
     float3 shadowFactor = 1.0f;//暂时使用1.0，不对计算产生影响
     //直接光照
     float4 directLight = ComputerLighting(gLights, mat, pin.WorldPos, worldNormal, worldView, shadowFactor);
-    //环境光照
-    float4 ambient = gAmbientLight * gDiffuseAlbedo;
+    //环境光照，要和采样器输出值结合
+    float4 ambient = gAmbientLight * diffuseAlbedo;
     
     float4 finalCol = ambient + directLight;
     finalCol.a = gDiffuseAlbedo.a;
