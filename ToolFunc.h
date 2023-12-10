@@ -94,10 +94,14 @@ struct Material
 {
 	std::string name;
 	int matCBIndex = -1;
+	int diffuseSrvHeapIndex = -1;
+	//int normalSrvHeaoIndex = -1;
+
 	int numFrameDirty = 3;//已更新标志，表示材质有变化，需要更新常量缓冲区
 	DirectX::XMFLOAT4 diffuseAlbedo = { 1.0f,1.0f,1.0f,1.0f };	//材质反照率
 	DirectX::XMFLOAT3 fresnelR0 = { 0.01f,0.01f,0.01f };			//RF（0）值，材质的反射属性
 	float roughness = 0.25f;							//材质粗糙度
+	
 };
 
 //绘制子物体需要的三个属性
@@ -153,6 +157,14 @@ struct MeshGeometry
 		vertexBufferUploader = nullptr;
 		indexBufferUploader = nullptr;
 	}
+};
+
+struct Texture
+{
+	std::string name;
+	std::wstring fileName;//纹理所在的目录名
+	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> uploadHeap = nullptr;
 };
 
 #ifndef ThrowIfFailed

@@ -10,12 +10,14 @@ struct Vertex
 {
     XMFLOAT3 Pos;
     XMFLOAT3 Normal;
+    XMFLOAT2 TexC;
 };
 
 //常量缓冲区结构体
 struct ObjectConstants
 {
     XMFLOAT4X4 world = MathHelper::Identity4x4();
+    XMFLOAT4X4 texTransform = MathHelper::Identity4x4();
 };
 
 //多常量缓冲区
@@ -34,6 +36,7 @@ struct MatConstants
     XMFLOAT4 diffuseAlbedo = { 1.0f,1.0f,1.0f,1.0f };   //材质反照率
     XMFLOAT3 fresnelR0 = { 0.01f,0.01f,0.01f };         //RF（0）值，即材质的反射属性
     float roughness = 0.25f;                            //材质粗糙度
+    XMFLOAT4X4 matTransform = MathHelper::Identity4x4();//纹理动画位移矩阵
 };
 
 class FrameResource

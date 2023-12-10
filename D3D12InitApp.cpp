@@ -1,6 +1,6 @@
 #include "D3D12InitApp.h"
 #include "ProceduralGeometry.h"
-
+#include "Common/DDSTextureLoader.h"
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
     PSTR cmdLine, int showCmd)
@@ -45,14 +45,17 @@ bool D3D12InitApp::Initialize()
     //初始化波浪数据
     waves = std::make_unique<Waves>(128, 128, 1.0f, 0.03f, 4.0f, 0.2f);
  
+    LoadTextures();
     BuildRootSignature();
+    BuildSRV();
     BuildShadersAndInputLayout();
     BuildGeometry();
     BuildLakeIndexBuffer();
     //BuildSkullGeometry();
+    BuildBoxGeometry();
     BuildMaterials();
     BuildRenderItem();
-    BuildRenderItem();
+
     BuildFrameResources();
     //BuildConstantBuffers();
     BuildPSO();
@@ -132,6 +135,9 @@ void D3D12InitApp::Draw(const GameTime& gt)
     ////设置CBV描述符堆
     //ID3D12DescriptorHeap* descriptorHeaps[] = { cbvHeap.Get() };
     //cmdList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+    //设置SRV描述符堆，和上面没什么区别
+    ID3D12DescriptorHeap* descriptorHeaps[] = { srvHeap.Get() };
+    cmdList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
     cmdList->SetGraphicsRootSignature(mRootSignature.Get());
 
@@ -144,7 +150,7 @@ void D3D12InitApp::Draw(const GameTime& gt)
    
     //设置passCB描述符
     auto passCB = currFrameResource->passCB->Resource();
-    cmdList->SetGraphicsRootConstantBufferView(2,
+    cmdList->SetGraphicsRootConstantBufferView(3,
         passCB->GetGPUVirtualAddress());
 
     DrawRenderItems();
@@ -307,18 +313,73 @@ void D3D12InitApp::BuildConstantBuffers()
 //    }
 }
 
+void D3D12InitApp::BuildSRV()
+{
+    D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc;
+    srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    srvHeapDesc.NumDescriptors = 3;
+    srvHeapDesc.NodeMask = 0;
+    ThrowIfFailed(d3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&srvHeap)));
+
+    auto woodCrateTex = textures["woodCrateTex"]->resource;
+    auto grassTex = textures["grassTex"]->resource;
+    auto lakeTex = textures["lakeTex"]->resource;
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE handle(srvHeap->GetCPUDescriptorHandleForHeapStart());
+    //SRV描述结构体
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Format = grassTex->GetDesc().Format;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MostDetailedMip = 0;
+    srvDesc.Texture2D.MipLevels = grassTex->GetDesc().MipLevels;
+    srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+    //创建SRV
+    d3dDevice->CreateShaderResourceView(grassTex.Get(), &srvDesc, handle);
+
+    //SRV堆中子SRV（湖水的SRV）的句柄,继续偏移一个SRV
+    handle.Offset(1, cbv_srv_uavDescriptorSize);
+    //SRV描述结构体修改
+    srvDesc.Format = lakeTex->GetDesc().Format;//视图的默认格式
+    srvDesc.Texture2D.MipLevels = lakeTex->GetDesc().MipLevels;//mipmap层级数量
+    //创建“湖水”的SRV
+    d3dDevice->CreateShaderResourceView(lakeTex.Get(), &srvDesc, handle);
+
+    //SRV堆中子SRV（板条箱的SRV）的句柄,继续偏移一个SRV
+    handle.Offset(1, cbv_srv_uavDescriptorSize);
+    //SRV描述结构体修改
+    srvDesc.Format = woodCrateTex->GetDesc().Format;//视图的默认格式
+    srvDesc.Texture2D.MipLevels = woodCrateTex->GetDesc().MipLevels;//mipmap层级数量
+    //创建“板条箱”的SRV
+    d3dDevice->CreateShaderResourceView(woodCrateTex.Get(), &srvDesc, handle);
+
+}
+
 void D3D12InitApp::BuildRootSignature()
 {
+
+    CD3DX12_DESCRIPTOR_RANGE srvTable;
+    srvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+        1,
+        0);
     //根参数可以是描述符表、根描述符、根常量    
-    CD3DX12_ROOT_PARAMETER slotRootParameter[3];
-    slotRootParameter[0].InitAsConstantBufferView(0);
-    slotRootParameter[1].InitAsConstantBufferView(1);
-    slotRootParameter[2].InitAsConstantBufferView(2);
+    CD3DX12_ROOT_PARAMETER slotRootParameter[4];
+    
+    slotRootParameter[0].InitAsDescriptorTable(1,
+        &srvTable,
+        D3D12_SHADER_VISIBILITY_PIXEL);
+    slotRootParameter[1].InitAsConstantBufferView(0);
+    slotRootParameter[2].InitAsConstantBufferView(1);
+    slotRootParameter[3].InitAsConstantBufferView(2);
+    
+    auto staticSamplers = GetStaticSamplers();
 
     //根签名由一组根参数构成
-    CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(3,      //根参数的数量 
+    CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(4,      //根参数的数量 
         slotRootParameter,                          //根参数指针
-        0, nullptr,
+        (UINT)staticSamplers.size(),
+        staticSamplers.data(),
         D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
     //用单个寄存器槽来创建一个根签名，该槽位指向一个仅含有单个常量缓冲区的描述符区域
@@ -350,7 +411,8 @@ void D3D12InitApp::BuildShadersAndInputLayout()
     mInputLayout =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
     };
 }
 
@@ -375,6 +437,7 @@ void D3D12InitApp::BuildGeometry()
         vertices[i].Pos.y = GetHillsHeight(vertices.at(i).Pos.x, vertices.at(i).Pos.z);
 
         vertices[i].Normal = GetHillsNormal(vertices.at(i).Pos.x, vertices.at(i).Pos.z);
+        vertices[i].TexC = grid.Vertices.at(i).TexC;
         ////颜色是RGBA
         //if (vertices.at(i).Pos.y < -10.0f)
         //{
@@ -528,6 +591,57 @@ void D3D12InitApp::BuildGeometry()
 #pragma endregion
 }
 
+void D3D12InitApp::BuildBoxGeometry()
+{
+    ProceduralGeometry proceGeo;
+    ProceduralGeometry::MeshData box = proceGeo.CreateBox(8.0f, 8.0f, 8.0f, 3);
+
+    //将顶点数据传入Vertex结构体的元素数组
+    size_t verticesCount = box.Vertices.size();
+    std::vector<Vertex> vertices(verticesCount);
+    for (size_t i = 0; i < verticesCount; i++)
+    {
+        vertices[i].Pos = box.Vertices[i].Position;
+        vertices[i].Normal = box.Vertices[i].Normal;
+        vertices[i].TexC = box.Vertices[i].TexC;
+    }
+
+    std::vector<std::uint16_t> indices = box.GetIndices16();
+
+    //顶点列表大小
+    const UINT vbByteSize = (UINT)verticesCount * sizeof(Vertex);
+    //索引列表大小
+    const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+
+    //绘制三参数
+    SubmeshGeometry submesh;
+    submesh.baseVertexLocation = 0;
+    submesh.startIndexLocation = 0;
+    submesh.indexCount = (UINT)indices.size();
+
+    //赋值mg中的数据元素
+    auto geo = std::make_unique<MeshGeometry>();
+    geo->name = "boxGeo";
+    geo->vertexByteStride = sizeof(Vertex);
+    geo->vertexBufferByteSize = vbByteSize;
+    geo->indexBufferByteSize = ibByteSize;
+    geo->indexFormat = DXGI_FORMAT_R16_UINT;
+    geo->DrawArgs["box"] = submesh;
+
+    ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->vertexBufferCpu));
+    CopyMemory(geo->vertexBufferCpu->GetBufferPointer(), vertices.data(), vbByteSize);
+    geo->vertexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(), cmdList.Get(),
+        vertices.data(), vbByteSize, geo->vertexBufferUploader);
+
+    ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->indexBufferCpu));
+    CopyMemory(geo->indexBufferCpu->GetBufferPointer(), indices.data(), ibByteSize);
+    geo->indexBufferGpu = ToolFunc::CreateDefaultBuffer(d3dDevice.Get(), cmdList.Get(), 
+        indices.data(), ibByteSize, geo->indexBufferUploader);
+
+    geometries["boxGeo"] = std::move(geo);
+
+}
+
 void D3D12InitApp::BuildPSO()
 {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc;
@@ -566,20 +680,35 @@ void D3D12InitApp::BuildMaterials()
     auto grass = std::make_unique<Material>();
     grass->name = "grass";
     grass->matCBIndex = 0;
-    grass->diffuseAlbedo = XMFLOAT4(0.2f, 0.6f, 0.2f, 1.0f);    //陆地反照率（颜色）
+    grass->diffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);    //陆地反照率（颜色）
     grass->fresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);           //陆地的R0
     grass->roughness = 0.125f;                                  //陆地的粗糙度（归一化后的）
+    grass->diffuseSrvHeapIndex = 0;
 
     //定义湖水的材质
     auto water = std::make_unique<Material>();
     water->name = "water";
     water->matCBIndex = 1;
-    water->diffuseAlbedo = XMFLOAT4(0.5f, 0.0f, 0.2f, 1.0f);    //湖水的反射率
+    water->diffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);    //湖水的反射率
     water->fresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
     water->roughness = 0.0f;
+    water->diffuseSrvHeapIndex = 1;
 
     materials["grass"] = std::move(grass);
     materials["water"] = std::move(water);
+#pragma endregion
+
+#pragma region box
+    auto wood = std::make_unique<Material>();
+    wood->name = "wood";
+    wood->matCBIndex = 2;
+    wood->diffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    wood->fresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
+    wood->roughness = 0.8f;
+    wood->diffuseSrvHeapIndex = 2;
+
+    materials["wood"] = std::move(wood);
+
 #pragma endregion
 
 #pragma region Shapes
@@ -630,6 +759,7 @@ void D3D12InitApp::BuildRenderItem()
     landRitem->indexCount = landRitem->geo->DrawArgs["landGrid"].indexCount;
     landRitem->baseVertexLocation = landRitem->geo->DrawArgs["landGrid"].baseVertexLocation;
     landRitem->startIndexLocation = landRitem->geo->DrawArgs["landGrid"].startIndexLocation;
+    XMStoreFloat4x4(&landRitem->texTransform, XMMatrixScaling(7.0f, 7.f, 1.0f));
    
     allRitems.push_back(std::move(landRitem));
 
@@ -646,10 +776,27 @@ void D3D12InitApp::BuildRenderItem()
     lakeRitem->indexCount = lakeRitem->geo->DrawArgs["lakeGrid"].indexCount;
     lakeRitem->baseVertexLocation = lakeRitem->geo->DrawArgs["lakeGrid"].baseVertexLocation;
     lakeRitem->startIndexLocation = lakeRitem->geo->DrawArgs["lakeGrid"].startIndexLocation;
+    XMStoreFloat4x4(&lakeRitem->texTransform, XMMatrixScaling(7.0f, 7.f, 1.0f));
 
     wavesRitem = lakeRitem.get();
 
     allRitems.push_back(std::move(lakeRitem));//被push_back后智能指针自动释放内存
+
+#pragma endregion
+
+#pragma region box
+    auto boxRitem = std::make_unique<RenderItem>();
+    XMStoreFloat4x4(&boxRitem->world, XMMatrixTranslation(0.0f, 4.0f, -7.0f));
+    boxRitem->objCBIndex = 2;
+    boxRitem->mat = materials["wood"].get();
+    boxRitem->geo = geometries["boxGeo"].get();
+    boxRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    boxRitem->indexCount = boxRitem->geo->DrawArgs["box"].indexCount;
+    boxRitem->baseVertexLocation = boxRitem->geo->DrawArgs["box"].baseVertexLocation;
+    boxRitem->startIndexLocation = boxRitem->geo->DrawArgs["box"].startIndexLocation;
+    boxRitem->texTransform = MathHelper::Identity4x4();
+    
+    allRitems.push_back(std::move(boxRitem));
 
 #pragma endregion
 
@@ -763,6 +910,10 @@ void D3D12InitApp::DrawRenderItems()
         cmdList->IASetIndexBuffer(&ritem->geo->GetIbv());
         cmdList->IASetPrimitiveTopology(ritem->primitiveType);
 
+        //设置根描述符表，将纹理资源与流水线绑定
+        CD3DX12_GPU_DESCRIPTOR_HANDLE texHandle(srvHeap->GetGPUDescriptorHandleForHeapStart());
+        texHandle.Offset(ritem->mat->diffuseSrvHeapIndex, cbv_srv_uavDescriptorSize);
+        
         ////设置根描述符表
         //UINT objCbvIndex = ritem->objCBIndex + currFrameResourceIndex * (UINT)allRitems.size();
         //auto handle = CD3DX12_GPU_DESCRIPTOR_HANDLE(cbvHeap->GetGPUDescriptorHandleForHeapStart());
@@ -772,14 +923,17 @@ void D3D12InitApp::DrawRenderItems()
         //设置根描述符
         auto objCBAddress = objCB->GetGPUVirtualAddress();
         objCBAddress += ritem->objCBIndex * objConstSize;
-        cmdList->SetGraphicsRootConstantBufferView(0,
-            objCBAddress);
-
+        
         //设置根描述符，将根描述符与matCB资源绑定
         auto matCBAddress = matCB->GetGPUVirtualAddress();
         matCBAddress += ritem->mat->matCBIndex * matConstantSize;
+        
+        cmdList->SetGraphicsRootDescriptorTable(0, texHandle);
         cmdList->SetGraphicsRootConstantBufferView(1,
+            objCBAddress);
+        cmdList->SetGraphicsRootConstantBufferView(2,
             matCBAddress);
+        
 
         //绘制顶点
         cmdList->DrawIndexedInstanced(ritem->indexCount,    //每个实例绘制的索引数量
@@ -802,11 +956,17 @@ void D3D12InitApp::UpdateObjCBs()
             XMMATRIX w = XMLoadFloat4x4(&mWorld);
             //转赋值
             XMStoreFloat4x4(&objConstants.world, XMMatrixTranspose(w));
+            XMFLOAT4X4 texTransform = e->texTransform;
+            XMMATRIX texTransMatrix = XMLoadFloat4x4(&texTransform);
+            XMStoreFloat4x4(&objConstants.texTransform, XMMatrixTranspose(texTransMatrix));
+            //将数据拷贝至GPU缓存
             currFrameResource->objCB->CopyData(e->objCBIndex, objConstants);
 
             e->NumFramesDirty--;
         }
     }
+
+    
 }
 
 void D3D12InitApp::UpdatePassCBs(const GameTime& gt)
@@ -886,6 +1046,8 @@ void D3D12InitApp::UpdateWaves(const GameTime& gt)
         v.Pos = waves->Position(i);
         v.Normal = waves->Normal(i);
         //v.Color = XMFLOAT4(DirectX::Colors::Red);
+        v.TexC.x = 0.5f + v.Pos.x / waves->Width();
+        v.TexC.y = 0.5f - v.Pos.z / waves->Depth();
 
         currWavesVB->CopyData(i, v);
     }
@@ -1086,4 +1248,86 @@ void D3D12InitApp::BuildSkullRenderItem()
     skullRitem->baseVertexLocation = skullRitem->geo->DrawArgs["skull"].baseVertexLocation;
     skullRitem->startIndexLocation = skullRitem->geo->DrawArgs["skull"].startIndexLocation;
     allRitems.push_back(std::move(skullRitem));
+}
+
+void D3D12InitApp::LoadTextures()
+{
+    //板条箱纹理
+    auto woodCrateTex = std::make_unique<Texture>();
+    woodCrateTex->name = "woodCrateTex";
+    woodCrateTex->fileName = L"Textures/WoodCrate02.dds";
+    //读取dds文件
+    ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(d3dDevice.Get(), cmdList.Get(),
+        woodCrateTex->fileName.c_str(),
+        woodCrateTex->resource, woodCrateTex->uploadHeap));
+
+    //草地纹理
+    auto grassTex = std::make_unique<Texture>();
+    grassTex->name = "grassTex";
+    grassTex->fileName = L"Textures/grass.dds";
+    //读取dds文件
+    ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(d3dDevice.Get(), cmdList.Get(),
+        grassTex->fileName.c_str(),
+        grassTex->resource, grassTex->uploadHeap));
+
+    //湖水纹理
+    auto lakeTex = std::make_unique<Texture>();
+    lakeTex->name = "lakeTex";
+    lakeTex->fileName = L"Textures/water1.dds";
+    //读取dds文件
+    ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(d3dDevice.Get(), cmdList.Get(),
+        lakeTex->fileName.c_str(),
+        lakeTex->resource, lakeTex->uploadHeap));
+
+    //加入总纹理列表
+    textures["woodCrateTex"] = std::move(woodCrateTex);
+    textures["grassTex"] = std::move(grassTex);
+    textures["lakeTex"] = std::move(lakeTex);
+}
+
+std::array<CD3DX12_STATIC_SAMPLER_DESC, 6> D3D12InitApp::GetStaticSamplers()
+{
+    //过滤器POINT,寻址模式WRAP的静态采样器
+    CD3DX12_STATIC_SAMPLER_DESC pointWarp(0,	//着色器寄存器
+        D3D12_FILTER_MIN_MAG_MIP_POINT,		//过滤器类型为POINT(常量插值)
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,	//U方向上的寻址模式为WRAP（重复寻址模式）
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,	//V方向上的寻址模式为WRAP（重复寻址模式）
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP);	//W方向上的寻址模式为WRAP（重复寻址模式）
+
+    //过滤器POINT,寻址模式CLAMP的静态采样器
+    CD3DX12_STATIC_SAMPLER_DESC pointClamp(1,	//着色器寄存器
+        D3D12_FILTER_MIN_MAG_MIP_POINT,		//过滤器类型为POINT(常量插值)
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP,	//U方向上的寻址模式为CLAMP（钳位寻址模式）
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP,	//V方向上的寻址模式为CLAMP（钳位寻址模式）
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP);	//W方向上的寻址模式为CLAMP（钳位寻址模式）
+
+    //过滤器LINEAR,寻址模式WRAP的静态采样器
+    CD3DX12_STATIC_SAMPLER_DESC linearWarp(2,	//着色器寄存器
+        D3D12_FILTER_MIN_MAG_MIP_LINEAR,		//过滤器类型为LINEAR(线性插值)
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,	//U方向上的寻址模式为WRAP（重复寻址模式）
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,	//V方向上的寻址模式为WRAP（重复寻址模式）
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP);	//W方向上的寻址模式为WRAP（重复寻址模式）
+
+    //过滤器LINEAR,寻址模式CLAMP的静态采样器
+    CD3DX12_STATIC_SAMPLER_DESC linearClamp(3,	//着色器寄存器
+        D3D12_FILTER_MIN_MAG_MIP_LINEAR,		//过滤器类型为LINEAR(线性插值)
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP,	//U方向上的寻址模式为CLAMP（钳位寻址模式）
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP,	//V方向上的寻址模式为CLAMP（钳位寻址模式）
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP);	//W方向上的寻址模式为CLAMP（钳位寻址模式）
+
+    //过滤器ANISOTROPIC,寻址模式WRAP的静态采样器
+    CD3DX12_STATIC_SAMPLER_DESC anisotropicWarp(4,	//着色器寄存器
+        D3D12_FILTER_ANISOTROPIC,			//过滤器类型为ANISOTROPIC(各向异性)
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,	//U方向上的寻址模式为WRAP（重复寻址模式）
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,	//V方向上的寻址模式为WRAP（重复寻址模式）
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP);	//W方向上的寻址模式为WRAP（重复寻址模式）
+
+    //过滤器LINEAR,寻址模式CLAMP的静态采样器
+    CD3DX12_STATIC_SAMPLER_DESC anisotropicClamp(5,	//着色器寄存器
+        D3D12_FILTER_ANISOTROPIC,			//过滤器类型为ANISOTROPIC(各向异性)
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP,	//U方向上的寻址模式为CLAMP（钳位寻址模式）
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP,	//V方向上的寻址模式为CLAMP（钳位寻址模式）
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP);	//W方向上的寻址模式为CLAMP（钳位寻址模式）
+
+    return{ pointWarp, pointClamp, linearWarp, linearClamp, anisotropicWarp, anisotropicClamp };
 }

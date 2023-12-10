@@ -12,11 +12,20 @@
 
 #include "LightingTools.hlsl"
 
+Texture2D gDiffuseMap : register(t0);
 
+//6个不同类型的采样器
+SamplerState gSamPointWrap : register(s0);
+SamplerState gSamPointClamp : register(s1);
+SamplerState gSamLinearWarp : register(s2);
+SamplerState gSamLinearClamp : register(s3);
+SamplerState gSamAnisotropicWarp : register(s4);
+SamplerState gSamAnisotropicClamp : register(s5);
 
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld; 
+    float4x4 gTexTransform; //UV顶点变换矩阵
 };
 
 cbuffer cbMaterial : register(b1)
@@ -24,6 +33,7 @@ cbuffer cbMaterial : register(b1)
     float4 gDiffuseAlbedo; //材质反照率
     float3 gFresnelR0; //RF(0)值，即材质的反射属性
     float gRoughness; //材质的粗糙度
+    float4x4 gMatTransform; //UV动画变换矩阵
 };
 
 cbuffer cbPass : register(b2)
@@ -39,6 +49,7 @@ struct VertexIn
 {
     float3 Vertex  : POSITION;
     float3 Normal : NORMAL;
+    float2 TexCoord : TEXCOORD;
 };
 
 struct VertexOut
@@ -46,6 +57,7 @@ struct VertexOut
     float4 Pos : SV_POSITION;
     float3 WorldPos : POSITION;
     float3 WorldNormal : NORMAL;
+    float2 UV : TEXCOORD;
 };
 
 VertexOut VS(VertexIn vin)
@@ -59,12 +71,17 @@ VertexOut VS(VertexIn vin)
     vout.WorldNormal = mul(vin.Normal, (float3x3)gWorld);
     
     vout.Pos = mul(PosW, gViewProj);
+
+    float4 TexCoord = mul(float4(vin.TexCoord, 0.0f, 1.0f), gTexTransform);
+    vout.UV = mul(TexCoord, gMatTransform).xy;
     
     return vout;
 }
 
 float4 PS(VertexOut pin) : SV_Target
 {
+    float4 diffuseAlbedo = gDiffuseMap.Sample(gSamAnisotropicWarp, pin.UV) * gDiffuseAlbedo;
+
     float3 worldNormal = normalize(pin.WorldNormal);
     float3 worldView = normalize(gEyePosW - pin.WorldPos);
     

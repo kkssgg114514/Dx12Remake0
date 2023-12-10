@@ -5,6 +5,7 @@
 #include "FrameResource.h"
 #include "Waves.h"
 
+
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
@@ -35,6 +36,8 @@ struct RenderItem
 
     Material* mat = nullptr;
     MeshGeometry* geo = nullptr;
+
+    XMFLOAT4X4 texTransform = MathHelper::Identity4x4();
 };
 
 class D3D12InitApp : public D3D12App
@@ -59,9 +62,11 @@ private:
 
 
     void BuildConstantBuffers();
+    void BuildSRV();
     void BuildRootSignature();
     void BuildShadersAndInputLayout();
     void BuildGeometry();
+    void BuildBoxGeometry();
     void BuildPSO();
 
     void BuildMaterials();
@@ -85,10 +90,16 @@ private:
     void BuildSkullGeometry();
     void BuildSkullRenderItem();
 
+    void LoadTextures();
+
+    //返回6种采样器
+    std::array<CD3DX12_STATIC_SAMPLER_DESC, 6> GetStaticSamplers();
+
 private:
 
     ComPtr<ID3D12RootSignature> mRootSignature = nullptr;
     ComPtr<ID3D12DescriptorHeap> cbvHeap = nullptr;
+    ComPtr<ID3D12DescriptorHeap> srvHeap = nullptr;
 
     int frameResourcesCount = 3;
     std::vector<std::unique_ptr<FrameResource>> FrameResourcesArray;
@@ -109,6 +120,8 @@ private:
 
     //绘制总表
     std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> geometries;
+
+    std::unordered_map<std::string, std::unique_ptr<Texture>> textures;
 
     ComPtr<ID3DBlob> mvsByteCode = nullptr;
     ComPtr<ID3DBlob> mpsByteCode = nullptr;
