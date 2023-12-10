@@ -97,6 +97,7 @@ void D3D12InitApp::Update(const GameTime& gt)
         CloseHandle;
     }
 
+    AnimateMaterials(gt);
     UpdateObjCBs();
     UpdatePassCBs(gt);
     UpdateMatCBs();
@@ -1140,6 +1141,8 @@ void D3D12InitApp::UpdateMatCBs()
             matConstants.diffuseAlbedo = mat->diffuseAlbedo;
             matConstants.fresnelR0 = mat->fresnelR0;
             matConstants.roughness = mat->roughness;
+            XMMATRIX matTransform = XMLoadFloat4x4(&mat->matTransform);
+            XMStoreFloat4x4(&matConstants.matTransform, XMMatrixTranspose(matTransform));
             //将材质常量数据复制到常量缓冲区对应索引地址处
             currFrameResource->matCB->CopyData(mat->matCBIndex, matConstants);
             //更新下一个帧资源
@@ -1330,4 +1333,28 @@ std::array<CD3DX12_STATIC_SAMPLER_DESC, 6> D3D12InitApp::GetStaticSamplers()
         D3D12_TEXTURE_ADDRESS_MODE_CLAMP);	//W方向上的寻址模式为CLAMP（钳位寻址模式）
 
     return{ pointWarp, pointClamp, linearWarp, linearClamp, anisotropicWarp, anisotropicClamp };
+}
+
+void D3D12InitApp::AnimateMaterials(const GameTime& gt)
+{
+    auto matLake = materials["water"].get();
+    float& du = matLake->matTransform(3, 0);
+    float& dv = matLake->matTransform(3, 1);
+
+    du += 0.1f * gt.DeltaTime();
+    dv += 0.02f * gt.DeltaTime();
+
+    if (du >= 1.0f)
+    {
+        du = 0.0f;
+    }
+    if (dv >= 1.0f)
+    {
+        dv = 0.0f;
+    }
+    //将两个变化量存入矩阵
+    matLake->matTransform(3, 0) = du;
+    matLake->matTransform(3, 1) = dv;
+
+    matLake->numFrameDirty = 3;
 }

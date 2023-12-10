@@ -95,6 +95,9 @@ private:
     //返回6种采样器
     std::array<CD3DX12_STATIC_SAMPLER_DESC, 6> GetStaticSamplers();
 
+    //计算湖水的贴图变换矩阵
+    void AnimateMaterials(const GameTime& gt);
+
 private:
 
     ComPtr<ID3D12RootSignature> mRootSignature = nullptr;

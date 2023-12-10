@@ -101,6 +101,8 @@ struct Material
 	DirectX::XMFLOAT4 diffuseAlbedo = { 1.0f,1.0f,1.0f,1.0f };	//材质反照率
 	DirectX::XMFLOAT3 fresnelR0 = { 0.01f,0.01f,0.01f };			//RF（0）值，材质的反射属性
 	float roughness = 0.25f;							//材质粗糙度
+
+	DirectX::XMFLOAT4X4 matTransform = MathHelper::Identity4x4();
 	
 };
 
