@@ -15,7 +15,7 @@
 Texture2D gDiffuseMap : register(t0);
 
 //6个不同类型的采样器
-SamplerState gSamPointWrap : register(s0);
+SamplerState gSamPointWarp : register(s0);
 SamplerState gSamPointClamp : register(s1);
 SamplerState gSamLinearWarp : register(s2);
 SamplerState gSamLinearClamp : register(s3);
