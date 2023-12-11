@@ -414,12 +414,13 @@ void D3D12InitApp::BuildShadersAndInputLayout()
     //编译着色器时定义的宏
     const D3D_SHADER_MACRO defines[] =
     {
-
+        "FOG", "1",
         NULL, NULL
     };
 
     const D3D_SHADER_MACRO alphaTestDefines[] =
     {
+        "FOG", "1",
         "ALPHA_TEST", "1",
         NULL, NULL
     };
@@ -1074,6 +1075,11 @@ void D3D12InitApp::UpdatePassCBs(const GameTime& gt)
     //球坐标转换成笛卡尔坐标
     XMVECTOR sunDir = -MathHelper::SphericalToCartesian(1.0f, sunTheta, sunPhi);
     XMStoreFloat3(&passConstants.lights[0].direction, sunDir);
+
+    passConstants.fogColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+    passConstants.fogRange = 200.0f;
+    passConstants.fogStart = 2.0f;
+    passConstants.pad2 = { 0.0f, 0.0f };
 
     currFrameResource->passCB->CopyData(0, passConstants);
 }

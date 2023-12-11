@@ -28,6 +28,11 @@ struct PassConstants
     XMFLOAT3 eyePosW = { 0.0f,0.0f,0.0f };
     float totalTime = 0.0f;
     XMFLOAT4 ambientLight = { 0.0f,0.0f,0.0f,1.0f };
+    XMFLOAT4 fogColor = { 1.0f,1.0f,1.0f,1.0f };
+    float fogStart = 1.0f;
+    float fogRange = 1.0f;
+    XMFLOAT2 pad2 = { 0.0f,0.0f };//Õ¼Î»·û
+
     Light lights[MAX_LIGHTS];
 };
 

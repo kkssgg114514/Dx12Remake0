@@ -42,6 +42,11 @@ cbuffer cbPass : register(b2)
     float3 gEyePosW;
     float gTotalTime;
     float4 gAmbientLight;
+    float4 gFogColor;
+    float gFogStart;
+    float gFogRange;
+    float2 gPad2;
+
     Light gLights[MAX_LIGHTS];
 };
 
@@ -81,20 +86,34 @@ VertexOut VS(VertexIn vin)
 float4 PS(VertexOut pin) : SV_Target
 {
     float4 diffuseAlbedo = gDiffuseMap.Sample(gSamAnisotropicWarp, pin.UV) * gDiffuseAlbedo;
+
 #ifdef ALPHA_TEST
     clip(diffuseAlbedo.a - 0.1f);
 #endif
+
     float3 worldNormal = normalize(pin.WorldNormal);
-    float3 worldView = normalize(gEyePosW - pin.WorldPos);
     
+    float3 worldPosToEye = gEyePosW - pin.WorldPos;
+    float disPosToEye = length(worldPosToEye);
+    float3 worldView = worldPosToEye / disPosToEye;
+
+    //float3 worldView = normalize(gEyePosW - pin.WorldPos);
+    //环境光照，要和采样器输出值结合
+    float4 ambient = gAmbientLight * diffuseAlbedo;
+
     Material mat = { diffuseAlbedo, gFresnelR0, gRoughness };
     float3 shadowFactor = 1.0f;//暂时使用1.0，不对计算产生影响
     //直接光照
     float4 directLight = ComputerLighting(gLights, mat, pin.WorldPos, worldNormal, worldView, shadowFactor);
-    //环境光照，要和采样器输出值结合
-    float4 ambient = gAmbientLight * diffuseAlbedo;
+    
     
     float4 finalCol = ambient + directLight;
+
+#ifdef FOG
+    float s = saturate((disPosToEye - gFogStart) / gFogRange);
+    finalCol = lerp(finalCol, gFogColor, s);
+#endif
+
     finalCol.a = gDiffuseAlbedo.a * 0.3f;
     
     return finalCol;
