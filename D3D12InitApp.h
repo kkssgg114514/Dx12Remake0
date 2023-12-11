@@ -40,6 +40,14 @@ struct RenderItem
     XMFLOAT4X4 texTransform = MathHelper::Identity4x4();
 };
 
+enum RenderLayer :int
+{
+    Opaque = 0,
+    Transparent = 1,
+    AlphaTest = 2,
+    Count = 3
+};
+
 class D3D12InitApp : public D3D12App
 {
 public:
@@ -72,7 +80,7 @@ private:
     void BuildMaterials();
 
     void BuildRenderItem();
-    void DrawRenderItems();
+    void DrawRenderItems(const std::vector<RenderItem*>& ritems);
 
     void UpdateObjCBs();
     void UpdatePassCBs(const GameTime& gt);
@@ -105,26 +113,21 @@ private:
     ComPtr<ID3D12DescriptorHeap> srvHeap = nullptr;
 
     int frameResourcesCount = 3;
-    std::vector<std::unique_ptr<FrameResource>> FrameResourcesArray;
     FrameResource* currFrameResource = nullptr;
     int currFrameResourceIndex = 0;
 
-    //std::unique_ptr<UploadBufferResource<ObjectConstants>> objCB = nullptr;
-    ////两个上传堆
-    //std::unique_ptr<UploadBufferResource<PassConstants>> passCB = nullptr;
-
-    std::unordered_map<std::string, std::unique_ptr<Material>> materials;
-
-    std::vector<std::unique_ptr<RenderItem>> allRitems;
-
     std::unique_ptr<Waves> waves;
-
     RenderItem* wavesRitem = nullptr;
 
-    //绘制总表
-    std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> geometries;
+    std::vector<std::unique_ptr<FrameResource>> FrameResourcesArray;
+    std::vector<std::unique_ptr<RenderItem>> allRitems;
+    std::vector<RenderItem*> ritemLayer[(int)RenderLayer::Count];
 
+    std::unordered_map<std::string, std::unique_ptr<Material>> materials;
+    std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> geometries;
     std::unordered_map<std::string, std::unique_ptr<Texture>> textures;
+    std::unordered_map<std::string, ComPtr<ID3DBlob>> shaders;
+    std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> PSOs;
 
     ComPtr<ID3DBlob> mvsByteCode = nullptr;
     ComPtr<ID3DBlob> mpsByteCode = nullptr;
@@ -144,22 +147,8 @@ private:
 
     POINT mLastMousePos;
 
-   /* ComPtr<ID3D12Resource> vertexBufferUploader;
-    ComPtr<ID3D12Resource> indexBufferUploader;
-
-    ComPtr<ID3D12Resource> vertexBufferGpu;
-    ComPtr<ID3D12Resource> indexBufferGpu;
-
-
-    ComPtr<ID3DBlob> vertexBufferCpu;
-    ComPtr<ID3DBlob> indexBufferCpu;*/
     //太阳（平行光）位置的球坐标
     float sunTheta = 1.25f * XM_PI;
     float sunPhi = XM_PIDIV4;
-
-    //UINT VertexBufferByteSize = 0;
-    //UINT IndexBufferByteSize = 0;
-
-   /* std::unordered_map<std::string, SubmeshGeometry> DrawArgs;*/
 
 };

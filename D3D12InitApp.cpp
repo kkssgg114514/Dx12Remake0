@@ -116,7 +116,8 @@ void D3D12InitApp::Draw(const GameTime& gt)
 
     auto currCmdAllocator = currFrameResource->cmdAllocator;
     ThrowIfFailed(currCmdAllocator->Reset());
-    ThrowIfFailed(cmdList->Reset(currCmdAllocator.Get(), mPSO.Get()));
+    //一开始还是设置不透明的
+    ThrowIfFailed(cmdList->Reset(currCmdAllocator.Get(), PSOs["opaque"].Get()));
 
     cmdList->RSSetViewports(1, &mScreenViewport);
     cmdList->RSSetScissorRects(1, &mScissorRect);
@@ -154,7 +155,11 @@ void D3D12InitApp::Draw(const GameTime& gt)
     cmdList->SetGraphicsRootConstantBufferView(3,
         passCB->GetGPUVirtualAddress());
 
-    DrawRenderItems();
+    DrawRenderItems(ritemLayer[(int)RenderLayer::Opaque]);
+    cmdList->SetPipelineState(PSOs["alphaTest"].Get());
+    DrawRenderItems(ritemLayer[(int)RenderLayer::AlphaTest]);
+    cmdList->SetPipelineState(PSOs["transparent"].Get());
+    DrawRenderItems(ritemLayer[(int)RenderLayer::Transparent]);
     
     // Indicate a state transition on the resource usage.
     cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
@@ -406,8 +411,24 @@ void D3D12InitApp::BuildShadersAndInputLayout()
 {
     HRESULT hr = S_OK;
 
-    mvsByteCode = ToolFunc::CompileShader(L"Shaders\\shade.hlsl", nullptr, "VS", "vs_5_0");
-    mpsByteCode = ToolFunc::CompileShader(L"Shaders\\shade.hlsl", nullptr, "PS", "ps_5_0");
+    //编译着色器时定义的宏
+    const D3D_SHADER_MACRO defines[] =
+    {
+
+        NULL, NULL
+    };
+
+    const D3D_SHADER_MACRO alphaTestDefines[] =
+    {
+        "ALPHA_TEST", "1",
+        NULL, NULL
+    };
+
+    shaders["standardVS"] = ToolFunc::CompileShader(L"Shaders\\shade.hlsl", nullptr, "VS", "vs_5_0");
+    shaders["opaquePS"] = ToolFunc::CompileShader(L"Shaders\\shade.hlsl", defines, "PS", "ps_5_0");
+    shaders["alphaTestPS"] = ToolFunc::CompileShader(L"Shaders\\shade.hlsl", alphaTestDefines, "PS", "ps_5_0");
+ /*   mvsByteCode = ToolFunc::CompileShader(L"Shaders\\shade.hlsl", nullptr, "VS", "vs_5_0");
+    mpsByteCode = ToolFunc::CompileShader(L"Shaders\\shade.hlsl", nullptr, "PS", "ps_5_0");*/
 
     mInputLayout =
     {
@@ -645,32 +666,86 @@ void D3D12InitApp::BuildBoxGeometry()
 
 void D3D12InitApp::BuildPSO()
 {
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc;
-    ZeroMemory(&psoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
-    psoDesc.InputLayout = { mInputLayout.data(), (UINT)mInputLayout.size() };
-    psoDesc.pRootSignature = mRootSignature.Get();
-    psoDesc.VS =
+    //要根据不同的渲染类型创建不同的PSO，分别是不透明（不需要混合），alpha测试的（不需要混合），透明（需要混合）的
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc = {};
+    ZeroMemory(&opaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+    opaquePsoDesc.InputLayout = { mInputLayout.data(), (UINT)mInputLayout.size() };
+    opaquePsoDesc.pRootSignature = mRootSignature.Get();
+    opaquePsoDesc.VS =
     {
-        reinterpret_cast<BYTE*>(mvsByteCode->GetBufferPointer()),
-        mvsByteCode->GetBufferSize()
+        reinterpret_cast<BYTE*>(shaders["standardVS"]->GetBufferPointer()),
+        shaders["standardVS"]->GetBufferSize()
     };
-    psoDesc.PS =
+    opaquePsoDesc.PS =
     {
-        reinterpret_cast<BYTE*>(mpsByteCode->GetBufferPointer()),
-        mpsByteCode->GetBufferSize()
+        reinterpret_cast<BYTE*>(shaders["opaquePS"]->GetBufferPointer()),
+        shaders["opaquePS"]->GetBufferSize()
     };
-    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    //psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
-    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-    psoDesc.SampleMask = UINT_MAX;
-    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoDesc.NumRenderTargets = 1;
-    psoDesc.RTVFormats[0] = mBackBufferFormat;
-    psoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
-    psoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
-    psoDesc.DSVFormat = mDepthStencilFormat;
-    ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPSO)));
+    opaquePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    //opaquePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+    opaquePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    opaquePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    opaquePsoDesc.SampleMask = UINT_MAX;
+    opaquePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    opaquePsoDesc.NumRenderTargets = 1;
+    opaquePsoDesc.RTVFormats[0] = mBackBufferFormat;
+    opaquePsoDesc.DSVFormat = mDepthStencilFormat;
+    opaquePsoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
+    opaquePsoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
+    ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&PSOs["opaque"])));
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC alphaTestPsoDesc = opaquePsoDesc;//使用不透明的PSO
+    alphaTestPsoDesc.PS =
+    {
+        reinterpret_cast<BYTE*>(shaders["alphaTestPS"]->GetBufferPointer()),
+        shaders["alphaTestPS"]->GetBufferSize()
+    };
+    alphaTestPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;//双面显示
+    ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&alphaTestPsoDesc, IID_PPV_ARGS(&PSOs["alphaTest"])));
+
+    //透明物体的PSO（需要混合）
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPsoDesc = opaquePsoDesc;//使用不透明的PSO
+    D3D12_RENDER_TARGET_BLEND_DESC transparencyBlendDesc;           
+    transparencyBlendDesc.BlendEnable = true;                               //是否开启常规混合（默认值为false）
+    transparencyBlendDesc.LogicOpEnable = false;                            //是否开启逻辑混合(默认值为false)
+    transparencyBlendDesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;                 //RGB混合中的源混合因子Fsrc（这里取源颜色的alpha通道值）
+    transparencyBlendDesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;            //RGB混合中的目标混合因子Fdest（这里取1-alpha）
+    transparencyBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;                     //RGB混合运算符(这里选择加法)
+    transparencyBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;	                //alpha混合中的源混合因子Fsrc（取1）
+    transparencyBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;                //alpha混合中的目标混合因子Fsrc（取0）
+    transparencyBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;                //alpha混合运算符(这里选择加法)
+    transparencyBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;	                //逻辑混合运算符(空操作，即不使用)
+    transparencyBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;//后台缓冲区写入遮罩（没有遮罩，即全部写入）
+
+    transparentPsoDesc.BlendState.RenderTarget[0] = transparencyBlendDesc;
+    ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&PSOs["transparent"])));
+
+    //D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc;
+    //ZeroMemory(&psoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+    //psoDesc.InputLayout = { mInputLayout.data(), (UINT)mInputLayout.size() };
+    //psoDesc.pRootSignature = mRootSignature.Get();
+    //psoDesc.VS =
+    //{
+    //    reinterpret_cast<BYTE*>(mvsByteCode->GetBufferPointer()),
+    //    mvsByteCode->GetBufferSize()
+    //};
+    //psoDesc.PS =
+    //{
+    //    reinterpret_cast<BYTE*>(mpsByteCode->GetBufferPointer()),
+    //    mpsByteCode->GetBufferSize()
+    //};
+    //psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    ////psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+    //psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    //psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    //psoDesc.SampleMask = UINT_MAX;
+    //psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    //psoDesc.NumRenderTargets = 1;
+    //psoDesc.RTVFormats[0] = mBackBufferFormat;
+    //psoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
+    //psoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
+    //psoDesc.DSVFormat = mDepthStencilFormat;
+    //ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPSO)));
 }
 
 void D3D12InitApp::BuildMaterials()
@@ -762,7 +837,10 @@ void D3D12InitApp::BuildRenderItem()
     landRitem->startIndexLocation = landRitem->geo->DrawArgs["landGrid"].startIndexLocation;
     XMStoreFloat4x4(&landRitem->texTransform, XMMatrixScaling(7.0f, 7.f, 1.0f));
    
+    ritemLayer[(int)RenderLayer::Opaque].push_back(landRitem.get());
+
     allRitems.push_back(std::move(landRitem));
+    //地面是不透明的
 
 #pragma endregion
 
@@ -780,7 +858,8 @@ void D3D12InitApp::BuildRenderItem()
     XMStoreFloat4x4(&lakeRitem->texTransform, XMMatrixScaling(7.0f, 7.f, 1.0f));
 
     wavesRitem = lakeRitem.get();
-
+    //水面是透明的
+    ritemLayer[(int)RenderLayer::Transparent].push_back(lakeRitem.get());
     allRitems.push_back(std::move(lakeRitem));//被push_back后智能指针自动释放内存
 
 #pragma endregion
@@ -796,7 +875,8 @@ void D3D12InitApp::BuildRenderItem()
     boxRitem->baseVertexLocation = boxRitem->geo->DrawArgs["box"].baseVertexLocation;
     boxRitem->startIndexLocation = boxRitem->geo->DrawArgs["box"].startIndexLocation;
     boxRitem->texTransform = MathHelper::Identity4x4();
-    
+    //箱子的纹理是需要透明度测试的    
+    ritemLayer[(int)RenderLayer::AlphaTest].push_back(boxRitem.get());
     allRitems.push_back(std::move(boxRitem));
 
 #pragma endregion
@@ -885,21 +965,14 @@ void D3D12InitApp::BuildRenderItem()
 //    BuildSkullRenderItem();
 }
 
-void D3D12InitApp::DrawRenderItems()
+void D3D12InitApp::DrawRenderItems(const std::vector<RenderItem*>& ritems)
 {
-    std::vector<RenderItem*> ritems;
     UINT objectCount = (UINT)allRitems.size();//物体总个数（包括实例）
     UINT objConstSize = ToolFunc::CalcConstantBufferByteSize(sizeof(ObjectConstants));
     UINT matConstantSize = ToolFunc::CalcConstantBufferByteSize(sizeof(MatConstants));
+
     auto objCB = currFrameResource->objCB->Resource();
     auto matCB = currFrameResource->matCB->Resource();
-    /*objCBByteSize = objConstSize;
-    passCBByteSize = passConstSize;*/
-    //先装进普通数组中
-    for (auto& e : allRitems)
-    {
-        ritems.push_back(e.get());
-    }
 
     //遍历渲染项数组
     for (size_t i = 0; i < ritems.size(); i++)
@@ -1258,7 +1331,7 @@ void D3D12InitApp::LoadTextures()
     //板条箱纹理
     auto woodCrateTex = std::make_unique<Texture>();
     woodCrateTex->name = "woodCrateTex";
-    woodCrateTex->fileName = L"Textures/WoodCrate02.dds";
+    woodCrateTex->fileName = L"Textures/WireFence.dds";
     //读取dds文件
     ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(d3dDevice.Get(), cmdList.Get(),
         woodCrateTex->fileName.c_str(),

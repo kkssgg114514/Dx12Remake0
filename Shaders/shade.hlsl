@@ -81,7 +81,9 @@ VertexOut VS(VertexIn vin)
 float4 PS(VertexOut pin) : SV_Target
 {
     float4 diffuseAlbedo = gDiffuseMap.Sample(gSamAnisotropicWarp, pin.UV) * gDiffuseAlbedo;
-
+#ifdef ALPHA_TEST
+    clip(diffuseAlbedo.a - 0.1f);
+#endif
     float3 worldNormal = normalize(pin.WorldNormal);
     float3 worldView = normalize(gEyePosW - pin.WorldPos);
     
@@ -93,7 +95,7 @@ float4 PS(VertexOut pin) : SV_Target
     float4 ambient = gAmbientLight * diffuseAlbedo;
     
     float4 finalCol = ambient + directLight;
-    finalCol.a = gDiffuseAlbedo.a;
+    finalCol.a = gDiffuseAlbedo.a * 0.3f;
     
     return finalCol;
 }
