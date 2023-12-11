@@ -80,7 +80,7 @@ VertexOut VS(VertexIn vin)
 
 float4 PS(VertexOut pin) : SV_Target
 {
-    float4 diffuseAlbedo = gDiffuseMap.Sample(gSamLinearWarp, pin.UV) * gDiffuseAlbedo;
+    float4 diffuseAlbedo = gDiffuseMap.Sample(gSamAnisotropicWarp, pin.UV) * gDiffuseAlbedo;
 
     float3 worldNormal = normalize(pin.WorldNormal);
     float3 worldView = normalize(gEyePosW - pin.WorldPos);
