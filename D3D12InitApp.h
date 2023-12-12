@@ -68,18 +68,12 @@ private:
     virtual void OnMouseMove(WPARAM btnState, int x, int y)override;
     void OnKeyboardInput(const GameTime& gt);
 
-
     void BuildConstantBuffers();
     void BuildSRV();
     void BuildRootSignature();
     void BuildShadersAndInputLayout();
-    void BuildGeometry();
-    void BuildBoxGeometry();
+    
     void BuildPSO();
-
-    void BuildMaterials();
-
-    void BuildRenderItem();
     void DrawRenderItems(const std::vector<RenderItem*>& ritems);
 
     void UpdateObjCBs();
@@ -87,24 +81,37 @@ private:
     void UpdateMatCBs();
 
     void BuildFrameResources();
+ 
+    //构建山川湖泊场景
+    void BuildHillGeometry();
+    void BuildBoxGeometry();
+    void BuildHillMaterials();
+    //计算湖水的贴图变换矩阵
+    void AnimateMaterials(const GameTime& gt);
+    //获得山峦海拔
+    float GetHillsHeight(float x, float z);
     void UpdateWaves(const GameTime& gt);
     void BuildLakeIndexBuffer();
     XMFLOAT3 GetHillsNormal(float x, float z)const;
- 
+    void LoadBoxTextures();
+    void BuildHillRenderItem();
 
-    //获得山峦海拔
-    float GetHillsHeight(float x, float z);
-
+    //构建经典场景
+    void BuildShapeGeometry();
+    void BuildShapeMaterials();
     void BuildSkullGeometry();
     void BuildSkullRenderItem();
+    void BuildShapeRenderItem();
 
-    void LoadTextures();
+    //构建室内场景
+    void BuildRoomGeometry();
+    void LoadRoomTextures();
+    void CreateRoomSRV();
+    void BuildMaterials();
+    void BuildRoomRenderItem();
 
     //返回6种采样器
     std::array<CD3DX12_STATIC_SAMPLER_DESC, 6> GetStaticSamplers();
-
-    //计算湖水的贴图变换矩阵
-    void AnimateMaterials(const GameTime& gt);
 
 private:
 
@@ -143,7 +150,7 @@ private:
 
     float mTheta = 1.5f * XM_PI;
     float mPhi = XM_PIDIV4;
-    float mRadius = 50.0f;
+    float mRadius = 17.0f;
 
     POINT mLastMousePos;
 
