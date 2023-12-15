@@ -173,9 +173,24 @@ void D3D12InitApp::Draw(const GameTime& gt)
 
 	DrawRenderItems(ritemLayer[(int)RenderLayer::Opaque]);
 
+	cmdList->OMSetStencilRef(1);//设置模板Ref值为1（作为Ref替换值，作为之后渲染物体的模板值）
+	cmdList->SetPipelineState(PSOs["markMirrorStencil"].Get());//设置镜子模板PSO
+	DrawRenderItems(ritemLayer[(int)RenderLayer::Mirrors]);//绘制镜子渲染项
+
+
 	cmdList->SetGraphicsRootConstantBufferView(3,
 		passCB->GetGPUVirtualAddress() + 1 * passCBByteSize);
+	cmdList->SetPipelineState(PSOs["reflectionsStencil"].Get());//设置镜像骷髅模板PSO
 	DrawRenderItems(ritemLayer[(int)RenderLayer::Reflects]);
+
+	//还原passCB和Ref模板值
+	cmdList->SetGraphicsRootConstantBufferView(3, passCB->GetGPUVirtualAddress());
+	cmdList->OMSetStencilRef(0);
+
+	//绘制镜子混合
+	cmdList->SetPipelineState(PSOs["transparent"].Get());//设置镜子PSO
+	DrawRenderItems(ritemLayer[(int)RenderLayer::Transparent]);//绘制透明渲染项
+	
 	//cmdList->SetPipelineState(PSOs["alphaTest"].Get());
 	//DrawRenderItems(ritemLayer[(int)RenderLayer::AlphaTest]);
 	//cmdList->SetPipelineState(PSOs["transparent"].Get());
@@ -630,6 +645,69 @@ void D3D12InitApp::BuildPSO()
 	transparencyBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;//后台缓冲区写入遮罩（没有遮罩，即全部写入）
 
 	transparentPsoDesc.BlendState.RenderTarget[0] = transparencyBlendDesc;
+	ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&PSOs["transparent"])));
+
+	CD3DX12_BLEND_DESC mirrorBlendState(D3D12_DEFAULT);
+	mirrorBlendState.RenderTarget[0].RenderTargetWriteMask = 0;	//禁止颜色数据写入
+
+	D3D12_DEPTH_STENCIL_DESC mirrorDepthStencil;
+	mirrorDepthStencil.DepthEnable = true;
+	mirrorDepthStencil.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;	//禁止深度写入
+	mirrorDepthStencil.DepthFunc = D3D12_COMPARISON_FUNC_LESS;	//比较函数”小于“
+	mirrorDepthStencil.StencilEnable = true;	//开启模板测试
+	mirrorDepthStencil.StencilReadMask = 0xff;	//不屏蔽模板值
+	mirrorDepthStencil.StencilWriteMask = 0xff;	//不屏蔽模板值
+	mirrorDepthStencil.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;	//模板测试失败，保持原模板值
+	mirrorDepthStencil.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;//深度测试失败，保持原模板值
+	mirrorDepthStencil.FrontFace.StencilPassOp = D3D12_STENCIL_OP_REPLACE;//深度模板测试通过，替换Ref模板值
+	mirrorDepthStencil.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;//比较函数“永远通过测试”
+	mirrorDepthStencil.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;//反面不渲染，随便写
+	mirrorDepthStencil.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;//反面不渲染，随便写
+	mirrorDepthStencil.BackFace.StencilPassOp = D3D12_STENCIL_OP_REPLACE;//反面不渲染，随便写
+	mirrorDepthStencil.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;//反面不渲染，随便写
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC mirrorPsoDesc = opaquePsoDesc;
+	mirrorPsoDesc.BlendState = mirrorBlendState;
+	mirrorPsoDesc.DepthStencilState = mirrorDepthStencil;
+
+	ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&mirrorPsoDesc, IID_PPV_ARGS(&PSOs["markMirrorStencil"])));
+
+	D3D12_DEPTH_STENCIL_DESC reflectionsDepthStencil;
+	reflectionsDepthStencil.DepthEnable = true;	//开启深度测试
+	reflectionsDepthStencil.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;//允许深度写入
+	reflectionsDepthStencil.DepthFunc = D3D12_COMPARISON_FUNC_LESS;//比较函数“小于”
+	reflectionsDepthStencil.StencilEnable = true;//开启模板测试
+	reflectionsDepthStencil.StencilReadMask = 0xff;//默认255，不屏蔽模板值
+	reflectionsDepthStencil.StencilWriteMask = 0xff;//默认255，不屏蔽模板值
+	reflectionsDepthStencil.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;//模板测试失败，保持原模板值
+	reflectionsDepthStencil.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;//深度测试失败，保持原模板值
+	reflectionsDepthStencil.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;//深度模板测试通过，保持原模板值模板值
+	reflectionsDepthStencil.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;//比较函数“等于”
+	reflectionsDepthStencil.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;//反面不渲染，随便写
+	reflectionsDepthStencil.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;//反面不渲染，随便写
+	reflectionsDepthStencil.BackFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;//反面不渲染，随便写
+	reflectionsDepthStencil.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;//反面不渲染，随便写
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC reflectionPsoDesc = opaquePsoDesc;
+	reflectionPsoDesc.DepthStencilState = reflectionsDepthStencil;
+
+	ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&reflectionPsoDesc, IID_PPV_ARGS(&PSOs["reflectionsStencil"])));
+
+	//使用透明混合算法
+	D3D12_RENDER_TARGET_BLEND_DESC transparentBlendState;
+	transparentBlendState.BlendEnable = true;//支持常规混合
+	transparentBlendState.LogicOpEnable = false;//不支持逻辑混合
+	transparentBlendState.SrcBlend = D3D12_BLEND_SRC_ALPHA;//源混合因子使用alpha
+	transparentBlendState.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;//目标混合因子使用1-alpha
+	transparentBlendState.BlendOp = D3D12_BLEND_OP_ADD;//加法颜色混合
+	transparentBlendState.SrcBlendAlpha = D3D12_BLEND_ONE;//alpha混合中的源混合因子Fsrc（取1）
+	transparentBlendState.DestBlendAlpha = D3D12_BLEND_ZERO;//alpha混合中的源混合因子Fdest（取0）
+	transparentBlendState.BlendOpAlpha = D3D12_BLEND_OP_ADD;//加法alpha混合
+	transparentBlendState.LogicOp = D3D12_LOGIC_OP_NOOP;//逻辑混合运算符(空操作，即不使用)
+	transparentBlendState.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;//后台缓冲区写入遮罩（没有遮罩，即全部写入）
+
+	transparentPsoDesc.BlendState.RenderTarget[0] = transparentBlendState;//赋值RenderTarget第一个元素，即对每一个渲染目标执行相同操作
+
 	ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&PSOs["transparent"])));
 
 	//D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc;
@@ -1618,7 +1696,8 @@ void D3D12InitApp::BuildRoomRenderItem()
 	mirrorRitem->baseVertexLocation = mirrorRitem->geo->DrawArgs["mirror"].baseVertexLocation;
 	mirrorRitem->startIndexLocation = mirrorRitem->geo->DrawArgs["mirror"].startIndexLocation;
 
-	ritemLayer[(int)RenderLayer::Opaque].push_back(mirrorRitem.get());
+	ritemLayer[(int)RenderLayer::Mirrors].push_back(mirrorRitem.get());
+	ritemLayer[(int)RenderLayer::Transparent].push_back(mirrorRitem.get());
 
 
 	auto skullRitem = std::make_unique<RenderItem>();
@@ -1643,6 +1722,14 @@ void D3D12InitApp::BuildRoomRenderItem()
 
 	ritemLayer[(int)RenderLayer::Reflects].push_back(skullMirrorRitem.get());
 
+	//auto skullCopyRitem = std::make_unique<RenderItem>();
+	//*skullCopyRitem = *skullRitem;
+	//XMStoreFloat4x4(&skullCopyRitem->world,
+	//	DirectX::XMMatrixScaling(0.5f, 0.5f, 0.5f) * DirectX::XMMatrixRotationY(1.57f) * DirectX::XMMatrixTranslation(0.0f, -1.5f, 5.0f));
+	//skullCopyRitem->objCBIndex = 5;
+
+	//ritemLayer[(int)RenderLayer::Opaque].push_back(skullCopyRitem.get());
+
 
 	//move会释放Ritem内存，所以必须在ritemLayer之后执行
 	allRitems.push_back(std::move(floorRitem));
@@ -1650,6 +1737,7 @@ void D3D12InitApp::BuildRoomRenderItem()
 	allRitems.push_back(std::move(mirrorRitem));
 	allRitems.push_back(std::move(skullRitem));
 	allRitems.push_back(std::move(skullMirrorRitem));
+	//allRitems.push_back(std::move(skullCopyRitem));
 }
 
 void D3D12InitApp::LoadBoxTextures()
