@@ -43,9 +43,12 @@ struct RenderItem
 enum RenderLayer :int
 {
     Opaque = 0,
-    Transparent = 1,
-    AlphaTest = 2,
-    Count = 3
+    Mirrors,
+    Reflects,
+    Transparent,
+    AlphaTest,
+    Shadow,
+    Count
 };
 
 class D3D12InitApp : public D3D12App
@@ -110,6 +113,9 @@ private:
     void BuildMaterials();
     void BuildRoomRenderItem();
 
+    //镜像中的光照反射
+    void UpdateReflectPassCB(const GameTime& gt);
+
     //返回6种采样器
     std::array<CD3DX12_STATIC_SAMPLER_DESC, 6> GetStaticSamplers();
 
@@ -143,6 +149,9 @@ private:
     std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
 
     ComPtr<ID3D12PipelineState> mPSO = nullptr;
+
+    PassConstants passConstants;
+    PassConstants reflectPassConstants;
 
     XMFLOAT4X4 mWorld = MathHelper::Identity4x4();
     XMFLOAT4X4 mView = MathHelper::Identity4x4();

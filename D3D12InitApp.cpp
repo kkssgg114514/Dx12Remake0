@@ -164,6 +164,7 @@ void D3D12InitApp::Draw(const GameTime& gt)
 	//passCbvHandle.Offset(passCBVIndex, cbv_srv_uavDescriptorSize);
 	//cmdList->SetGraphicsRootDescriptorTable(1,  //根参数的起始索引
 	//    passCbvHandle);
+	UINT passCBByteSize = ToolFunc::CalcConstantBufferByteSize(sizeof(PassConstants));
 
 	//设置passCB描述符
 	auto passCB = currFrameResource->passCB->Resource();
@@ -171,10 +172,14 @@ void D3D12InitApp::Draw(const GameTime& gt)
 		passCB->GetGPUVirtualAddress());
 
 	DrawRenderItems(ritemLayer[(int)RenderLayer::Opaque]);
-	cmdList->SetPipelineState(PSOs["alphaTest"].Get());
-	DrawRenderItems(ritemLayer[(int)RenderLayer::AlphaTest]);
-	cmdList->SetPipelineState(PSOs["transparent"].Get());
-	DrawRenderItems(ritemLayer[(int)RenderLayer::Transparent]);
+
+	cmdList->SetGraphicsRootConstantBufferView(3,
+		passCB->GetGPUVirtualAddress() + 1 * passCBByteSize);
+	DrawRenderItems(ritemLayer[(int)RenderLayer::Reflects]);
+	//cmdList->SetPipelineState(PSOs["alphaTest"].Get());
+	//DrawRenderItems(ritemLayer[(int)RenderLayer::AlphaTest]);
+	//cmdList->SetPipelineState(PSOs["transparent"].Get());
+	//DrawRenderItems(ritemLayer[(int)RenderLayer::Transparent]);
 
 	// Indicate a state transition on the resource usage.
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
@@ -829,8 +834,6 @@ void D3D12InitApp::UpdatePassCBs(const GameTime& gt)
 	// 构建投影矩阵
 	XMMATRIX proj = XMLoadFloat4x4(&mProj);
 
-	PassConstants passConstants;
-
 	////构建观察矩阵
 	float x = mRadius * sinf(mPhi) * cosf(mTheta);
 	float z = mRadius * sinf(mPhi) * sinf(mTheta);
@@ -862,6 +865,7 @@ void D3D12InitApp::UpdatePassCBs(const GameTime& gt)
 	passConstants.pad2 = { 0.0f, 0.0f };
 
 	currFrameResource->passCB->CopyData(0, passConstants);
+	UpdateReflectPassCB(gt);
 }
 
 void D3D12InitApp::BuildFrameResources()
@@ -870,7 +874,7 @@ void D3D12InitApp::BuildFrameResources()
 	{
 		FrameResourcesArray.push_back(std::make_unique<FrameResource>(
 			d3dDevice.Get(),
-			1,
+			2,
 			(UINT)allRitems.size(),     //子物体缓冲数量
 			(UINT)materials.size(),     //材质数量
 			waves->VertexCount()        //顶点缓冲数量
@@ -1573,7 +1577,7 @@ void D3D12InitApp::BuildMaterials()
 void D3D12InitApp::BuildRoomRenderItem()
 {
 	auto floorRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&(floorRitem->world), DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f) * DirectX::XMMatrixTranslation(0.0f, -2.0f, 5.0f));
+	XMStoreFloat4x4(&(floorRitem->world), DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f) * DirectX::XMMatrixTranslation(0.0f, -2.0f, 3.0f));
 	//floorRitem->world = MathHelper::Identity4x4();
 	floorRitem->objCBIndex = 0;//floor常量数据（world矩阵）在objConstantBuffer索引1上
 	floorRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -1588,7 +1592,7 @@ void D3D12InitApp::BuildRoomRenderItem()
 
 
 	auto wallRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&(wallRitem->world), DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f) * DirectX::XMMatrixTranslation(0.0f, -2.0f, 5.0f));
+	XMStoreFloat4x4(&(wallRitem->world), DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f) * DirectX::XMMatrixTranslation(0.0f, -2.0f, 3.0f));
 	//wallRitem->world = MathHelper::Identity4x4();
 	wallRitem->objCBIndex = 1;//floor常量数据（world矩阵）在objConstantBuffer索引1上
 	wallRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -1603,7 +1607,7 @@ void D3D12InitApp::BuildRoomRenderItem()
 
 
 	auto mirrorRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&(mirrorRitem->world), DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f) * DirectX::XMMatrixTranslation(0.0f, -2.0f, 5.0f));
+	XMStoreFloat4x4(&(mirrorRitem->world), DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f) * DirectX::XMMatrixTranslation(0.0f, -2.0f, 3.0f));
 	//mirrorRitem->world = MathHelper::Identity4x4();
 	mirrorRitem->objCBIndex = 2;//floor常量数据（world矩阵）在objConstantBuffer索引1上
 	mirrorRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -1619,7 +1623,7 @@ void D3D12InitApp::BuildRoomRenderItem()
 
 	auto skullRitem = std::make_unique<RenderItem>();
 	XMStoreFloat4x4(&skullRitem->world,
-		DirectX::XMMatrixScaling(0.5f, 0.5f, 0.5f) * DirectX::XMMatrixTranslation(0.0f, -1.5f, 0.0f) * DirectX::XMMatrixRotationY(1.57f));
+		DirectX::XMMatrixScaling(0.5f, 0.5f, 0.5f) * DirectX::XMMatrixTranslation(0.0f, -1.5f, -1.0f) * DirectX::XMMatrixRotationY(1.57f));
 	skullRitem->objCBIndex = 3;//skull常量数据（world矩阵）在objConstantBuffer索引1上
 	skullRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	skullRitem->geo = geometries["skullGeo"].get();
@@ -1631,11 +1635,21 @@ void D3D12InitApp::BuildRoomRenderItem()
 
 	ritemLayer[(int)RenderLayer::Opaque].push_back(skullRitem.get());
 
+	auto skullMirrorRitem = std::make_unique<RenderItem>();
+	*skullMirrorRitem = *skullRitem;
+	XMStoreFloat4x4(&skullMirrorRitem->world,
+		DirectX::XMMatrixScaling(0.5f, 0.5f, 0.5f) * DirectX::XMMatrixRotationY(1.57f) * DirectX::XMMatrixTranslation(0.0f, -1.5f, 7.0f));
+	skullMirrorRitem->objCBIndex = 4;
+
+	ritemLayer[(int)RenderLayer::Reflects].push_back(skullMirrorRitem.get());
+
+
 	//move会释放Ritem内存，所以必须在ritemLayer之后执行
 	allRitems.push_back(std::move(floorRitem));
 	allRitems.push_back(std::move(wallRitem));
 	allRitems.push_back(std::move(mirrorRitem));
 	allRitems.push_back(std::move(skullRitem));
+	allRitems.push_back(std::move(skullMirrorRitem));
 }
 
 void D3D12InitApp::LoadBoxTextures()
@@ -1718,6 +1732,23 @@ std::array<CD3DX12_STATIC_SAMPLER_DESC, 6> D3D12InitApp::GetStaticSamplers()
 		D3D12_TEXTURE_ADDRESS_MODE_CLAMP);	//W方向上的寻址模式为CLAMP（钳位寻址模式）
 
 	return{ pointWarp, pointClamp, linearWarp, linearClamp, anisotropicWarp, anisotropicClamp };
+}
+
+void D3D12InitApp::UpdateReflectPassCB(const GameTime& gt)
+{
+	reflectPassConstants = passConstants;
+	XMVECTOR mirrorPlane = XMVectorSet(0.0f, 0.0f, 3.0f, 0.0f);
+	XMMATRIX R = XMMatrixReflect(mirrorPlane);
+
+	//镜像灯光
+	for (int i = 0; i < 3; ++i)
+	{
+		XMVECTOR lightDir = XMLoadFloat3(&passConstants.lights[i].direction);
+		XMVECTOR reflectedLightDir = XMVector3TransformNormal(lightDir, R);
+		XMStoreFloat3(&reflectPassConstants.lights[i].direction, reflectedLightDir);
+	}
+
+	currFrameResource->passCB->CopyData(1, reflectPassConstants);
 }
 
 void D3D12InitApp::AnimateMaterials(const GameTime& gt)
