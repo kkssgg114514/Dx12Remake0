@@ -147,6 +147,10 @@ private:
 
     //声明了输入布局描述，用来让DirectX知道顶点的结构
     std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
+    //提取指针
+    RenderItem* mSkullRitem = nullptr;
+    RenderItem* mSkullMirrorRitem = nullptr;
+    RenderItem* mSkullShadowRitem = nullptr;
 
     ComPtr<ID3D12PipelineState> mPSO = nullptr;
 
@@ -162,6 +166,9 @@ private:
     float mRadius = 17.0f;
 
     POINT mLastMousePos;
+
+    //骷髅的位置变换
+    XMFLOAT3 skullTranslation = { 0.0f,1.0f,-5.0f };
 
     //太阳（平行光）位置的球坐标
     float sunTheta = 1.25f * XM_PI;

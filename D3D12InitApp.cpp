@@ -190,6 +190,8 @@ void D3D12InitApp::Draw(const GameTime& gt)
 	//绘制镜子混合
 	cmdList->SetPipelineState(PSOs["transparent"].Get());//设置镜子PSO
 	DrawRenderItems(ritemLayer[(int)RenderLayer::Transparent]);//绘制透明渲染项
+	cmdList->SetPipelineState(PSOs["shadow"].Get());
+	DrawRenderItems(ritemLayer[(int)RenderLayer::Shadow]);
 	
 	//cmdList->SetPipelineState(PSOs["alphaTest"].Get());
 	//DrawRenderItems(ritemLayer[(int)RenderLayer::AlphaTest]);
@@ -283,6 +285,48 @@ void D3D12InitApp::OnKeyboardInput(const GameTime& gt)
 	}
 	//将Phi约束在[0, PI/2]之间
 	sunPhi = MathHelper::Clamp(sunPhi, 0.1f, XM_PIDIV2);
+
+	if (GetAsyncKeyState('A') & 0x8000)
+	{
+		skullTranslation.x -= 1.0f * dt;
+	}
+	if (GetAsyncKeyState('D') & 0x8000)
+	{
+		skullTranslation.x += 1.0 * dt;
+	}
+	if (GetAsyncKeyState('W') & 0x8000)
+	{
+		skullTranslation.y += 1.0f * dt;
+	}
+	if (GetAsyncKeyState('S') & 0x8000)
+	{
+		skullTranslation.y -= 1.0f * dt;
+	}
+
+	skullTranslation.y = MathHelper::Max(-5.0f, skullTranslation.y);
+
+	//更新骷髅的世界矩阵
+	XMMATRIX skullRotate = XMMatrixRotationY(1.57f);
+	XMMATRIX skullScale = XMMatrixScaling(0.4f, 0.4f, 0.4f);
+	XMMATRIX skullTranslate = XMMatrixTranslation(skullTranslation.x, skullTranslation.y, skullTranslation.z);
+	XMMATRIX skullWorld = skullRotate * skullScale * skullTranslate;
+	XMStoreFloat4x4(&mSkullRitem->world, skullWorld);
+
+	XMVECTOR mirrorPlane = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+	XMMATRIX reflectMatrix = XMMatrixReflect(mirrorPlane);
+	XMStoreFloat4x4(&mSkullMirrorRitem->world, skullWorld * reflectMatrix);
+
+	XMVECTOR shadowPlane = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+	//passConstants.lights[0].direction = { 0.57735f,-0.57735f,0.57735f };
+	XMVECTOR mainLightDir = -XMLoadFloat3(&passConstants.lights[0].direction);
+	XMMATRIX shadowMatrix = XMMatrixShadow(shadowPlane, mainLightDir);
+	XMMATRIX yOffset = XMMatrixTranslation(0.0f, 0.001f, 0.0f);
+	XMStoreFloat4x4(&mSkullShadowRitem->world, skullWorld * shadowMatrix * yOffset);
+
+	mSkullRitem->NumFramesDirty = frameResourcesCount;
+	mSkullMirrorRitem->NumFramesDirty = frameResourcesCount;
+	mSkullShadowRitem->NumFramesDirty = frameResourcesCount;
+
 }
 
 void D3D12InitApp::BuildConstantBuffers()
@@ -690,25 +734,31 @@ void D3D12InitApp::BuildPSO()
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC reflectionPsoDesc = opaquePsoDesc;
 	reflectionPsoDesc.DepthStencilState = reflectionsDepthStencil;
+	reflectionPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+	reflectionPsoDesc.RasterizerState.FrontCounterClockwise = true;
 
 	ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&reflectionPsoDesc, IID_PPV_ARGS(&PSOs["reflectionsStencil"])));
 
-	//使用透明混合算法
-	D3D12_RENDER_TARGET_BLEND_DESC transparentBlendState;
-	transparentBlendState.BlendEnable = true;//支持常规混合
-	transparentBlendState.LogicOpEnable = false;//不支持逻辑混合
-	transparentBlendState.SrcBlend = D3D12_BLEND_SRC_ALPHA;//源混合因子使用alpha
-	transparentBlendState.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;//目标混合因子使用1-alpha
-	transparentBlendState.BlendOp = D3D12_BLEND_OP_ADD;//加法颜色混合
-	transparentBlendState.SrcBlendAlpha = D3D12_BLEND_ONE;//alpha混合中的源混合因子Fsrc（取1）
-	transparentBlendState.DestBlendAlpha = D3D12_BLEND_ZERO;//alpha混合中的源混合因子Fdest（取0）
-	transparentBlendState.BlendOpAlpha = D3D12_BLEND_OP_ADD;//加法alpha混合
-	transparentBlendState.LogicOp = D3D12_LOGIC_OP_NOOP;//逻辑混合运算符(空操作，即不使用)
-	transparentBlendState.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;//后台缓冲区写入遮罩（没有遮罩，即全部写入）
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowsBlendPsoDesc = transparentPsoDesc;
 
-	transparentPsoDesc.BlendState.RenderTarget[0] = transparentBlendState;//赋值RenderTarget第一个元素，即对每一个渲染目标执行相同操作
+	D3D12_DEPTH_STENCIL_DESC shadowsDepthStencil;
+	shadowsDepthStencil.DepthEnable = true;	//开启深度测试
+	shadowsDepthStencil.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;//允许深度写入
+	shadowsDepthStencil.DepthFunc = D3D12_COMPARISON_FUNC_LESS;//比较函数“小于”
+	shadowsDepthStencil.StencilEnable = true;//开启模板测试
+	shadowsDepthStencil.StencilReadMask = 0xff;//默认255，不屏蔽模板值
+	shadowsDepthStencil.StencilWriteMask = 0xff;//默认255，不屏蔽模板值
+	shadowsDepthStencil.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;//模板测试失败，保持原模板值
+	shadowsDepthStencil.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;//深度测试失败，保持原模板值
+	shadowsDepthStencil.FrontFace.StencilPassOp = D3D12_STENCIL_OP_INCR;//深度模板测试通过，模板值递增
+	shadowsDepthStencil.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;//比较函数“等于”
+	shadowsDepthStencil.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;//反面不渲染，随便写
+	shadowsDepthStencil.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;//反面不渲染，随便写
+	shadowsDepthStencil.BackFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;//反面不渲染，随便写
+	shadowsDepthStencil.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;//反面不渲染，随便写
 
-	ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&PSOs["transparent"])));
+	shadowsBlendPsoDesc.DepthStencilState = shadowsDepthStencil;
+	ThrowIfFailed(d3dDevice->CreateGraphicsPipelineState(&shadowsBlendPsoDesc, IID_PPV_ARGS(&PSOs["shadow"])));
 
 	//D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc;
 	//ZeroMemory(&psoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
@@ -1624,7 +1674,7 @@ void D3D12InitApp::BuildMaterials()
 	wall->name = "wall";
 	wall->matCBIndex = 1;
 	wall->diffuseSrvHeapIndex = 1;
-	wall->diffuseAlbedo = XMFLOAT4(0.91f, 0.91f, 0.91f, 1.0f);
+	wall->diffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	wall->fresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
 	wall->roughness = 0.6f;
 
@@ -1633,7 +1683,7 @@ void D3D12InitApp::BuildMaterials()
 	mirror->name = "mirror";
 	mirror->matCBIndex = 2;
 	mirror->diffuseSrvHeapIndex = 2;
-	mirror->diffuseAlbedo = XMFLOAT4(0.91f, 0.91f, 0.91f, 1.0f);
+	mirror->diffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	mirror->fresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	mirror->roughness = 0.1f;
 
@@ -1642,26 +1692,38 @@ void D3D12InitApp::BuildMaterials()
 	bone->name = "bone";
 	bone->matCBIndex = 3;
 	bone->diffuseSrvHeapIndex = 3;
-	bone->diffuseAlbedo = XMFLOAT4(0.91f, 0.91f, 0.91f, 1.0f);
+	bone->diffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	bone->fresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
 	bone->roughness = 0.3f;
+
+	//定义阴影材质
+	auto shadow = std::make_unique<Material>();
+	shadow->name = "shadow";
+	shadow->matCBIndex = 4;
+	shadow->diffuseSrvHeapIndex = 3;
+	shadow->diffuseAlbedo = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.90f);
+	shadow->fresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
+	shadow->roughness = 0.0f;
+
 
 	materials["floor"] = std::move(floor);
 	materials["wall"] = std::move(wall);
 	materials["mirror"] = std::move(mirror);
 	materials["bone"] = std::move(bone);
+	materials["shadow"] = std::move(shadow);
 }
 
 void D3D12InitApp::BuildRoomRenderItem()
 {
 	auto floorRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&(floorRitem->world), DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f) * DirectX::XMMatrixTranslation(0.0f, -2.0f, 3.0f));
-	//floorRitem->world = MathHelper::Identity4x4();
+	//XMStoreFloat4x4(&(floorRitem->world), DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f) * DirectX::XMMatrixTranslation(0.0f, -2.0f, 3.0f));
+	floorRitem->world = MathHelper::Identity4x4();
 	floorRitem->objCBIndex = 0;//floor常量数据（world矩阵）在objConstantBuffer索引1上
 	floorRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	floorRitem->geo = geometries["roomGeo"].get();
 	floorRitem->mat = materials["floor"].get();//赋予骨头材质给骷髅头
-	XMStoreFloat4x4(&floorRitem->texTransform, DirectX::XMMatrixScaling(1.6f, 1.6f, 1.6f));
+	//XMStoreFloat4x4(&floorRitem->texTransform, DirectX::XMMatrixScaling(1.6f, 1.6f, 1.6f));
+	floorRitem->texTransform = MathHelper::Identity4x4();
 	floorRitem->indexCount = floorRitem->geo->DrawArgs["floor"].indexCount;
 	floorRitem->baseVertexLocation = floorRitem->geo->DrawArgs["floor"].baseVertexLocation;
 	floorRitem->startIndexLocation = floorRitem->geo->DrawArgs["floor"].startIndexLocation;
@@ -1670,13 +1732,14 @@ void D3D12InitApp::BuildRoomRenderItem()
 
 
 	auto wallRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&(wallRitem->world), DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f) * DirectX::XMMatrixTranslation(0.0f, -2.0f, 3.0f));
-	//wallRitem->world = MathHelper::Identity4x4();
+	//XMStoreFloat4x4(&(wallRitem->world), DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f) * DirectX::XMMatrixTranslation(0.0f, -2.0f, 3.0f));
+	wallRitem->world = MathHelper::Identity4x4();
 	wallRitem->objCBIndex = 1;//floor常量数据（world矩阵）在objConstantBuffer索引1上
 	wallRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	wallRitem->geo = geometries["roomGeo"].get();
 	wallRitem->mat = materials["wall"].get();//赋予骨头材质给骷髅头
-	XMStoreFloat4x4(&wallRitem->texTransform, DirectX::XMMatrixScaling(0.8f, 0.8f, 0.8f));
+	//XMStoreFloat4x4(&wallRitem->texTransform, DirectX::XMMatrixScaling(0.8f, 0.8f, 0.8f));
+	wallRitem->texTransform = MathHelper::Identity4x4();
 	wallRitem->indexCount = wallRitem->geo->DrawArgs["wall"].indexCount;
 	wallRitem->baseVertexLocation = wallRitem->geo->DrawArgs["wall"].baseVertexLocation;
 	wallRitem->startIndexLocation = wallRitem->geo->DrawArgs["wall"].startIndexLocation;
@@ -1685,13 +1748,14 @@ void D3D12InitApp::BuildRoomRenderItem()
 
 
 	auto mirrorRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&(mirrorRitem->world), DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f) * DirectX::XMMatrixTranslation(0.0f, -2.0f, 3.0f));
-	//mirrorRitem->world = MathHelper::Identity4x4();
+	//XMStoreFloat4x4(&(mirrorRitem->world), DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f) * DirectX::XMMatrixTranslation(0.0f, -2.0f, 3.0f));
+	mirrorRitem->world = MathHelper::Identity4x4();
 	mirrorRitem->objCBIndex = 2;//floor常量数据（world矩阵）在objConstantBuffer索引1上
 	mirrorRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	mirrorRitem->geo = geometries["roomGeo"].get();
 	mirrorRitem->mat = materials["mirror"].get();//赋予骨头材质给骷髅头
-	XMStoreFloat4x4(&mirrorRitem->texTransform, DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f));
+	//XMStoreFloat4x4(&mirrorRitem->texTransform, DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f));
+	mirrorRitem->texTransform = MathHelper::Identity4x4();
 	mirrorRitem->indexCount = mirrorRitem->geo->DrawArgs["mirror"].indexCount;
 	mirrorRitem->baseVertexLocation = mirrorRitem->geo->DrawArgs["mirror"].baseVertexLocation;
 	mirrorRitem->startIndexLocation = mirrorRitem->geo->DrawArgs["mirror"].startIndexLocation;
@@ -1701,25 +1765,27 @@ void D3D12InitApp::BuildRoomRenderItem()
 
 
 	auto skullRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&skullRitem->world,
-		DirectX::XMMatrixScaling(0.5f, 0.5f, 0.5f) * DirectX::XMMatrixTranslation(0.0f, -1.5f, -1.0f) * DirectX::XMMatrixRotationY(1.57f));
+	//XMStoreFloat4x4(&skullRitem->world,
+		//DirectX::XMMatrixScaling(0.5f, 0.5f, 0.5f) * DirectX::XMMatrixTranslation(0.0f, -1.5f, -1.0f) * DirectX::XMMatrixRotationY(1.57f));
+	skullRitem->world = MathHelper::Identity4x4();
 	skullRitem->objCBIndex = 3;//skull常量数据（world矩阵）在objConstantBuffer索引1上
 	skullRitem->primitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	skullRitem->geo = geometries["skullGeo"].get();
 	skullRitem->mat = materials["bone"].get();//赋予骨头材质给骷髅头
 	//XMStoreFloat4x4(&skullRitem->texTransform, XMMatrixScaling(7.0f, 7.0f, 7.0f));
+	skullRitem->texTransform = MathHelper::Identity4x4();
 	skullRitem->indexCount = skullRitem->geo->DrawArgs["skull"].indexCount;
 	skullRitem->baseVertexLocation = skullRitem->geo->DrawArgs["skull"].baseVertexLocation;
 	skullRitem->startIndexLocation = skullRitem->geo->DrawArgs["skull"].startIndexLocation;
-
+	mSkullRitem = skullRitem.get();
 	ritemLayer[(int)RenderLayer::Opaque].push_back(skullRitem.get());
 
 	auto skullMirrorRitem = std::make_unique<RenderItem>();
 	*skullMirrorRitem = *skullRitem;
-	XMStoreFloat4x4(&skullMirrorRitem->world,
-		DirectX::XMMatrixScaling(0.5f, 0.5f, 0.5f) * DirectX::XMMatrixRotationY(1.57f) * DirectX::XMMatrixTranslation(0.0f, -1.5f, 7.0f));
+	/*XMStoreFloat4x4(&skullMirrorRitem->world,
+		DirectX::XMMatrixScaling(0.5f, 0.5f, 0.5f) * DirectX::XMMatrixRotationY(1.57f) * DirectX::XMMatrixTranslation(0.0f, -1.5f, 7.0f));*/
 	skullMirrorRitem->objCBIndex = 4;
-
+	mSkullMirrorRitem = skullMirrorRitem.get();
 	ritemLayer[(int)RenderLayer::Reflects].push_back(skullMirrorRitem.get());
 
 	//auto skullCopyRitem = std::make_unique<RenderItem>();
@@ -1727,8 +1793,14 @@ void D3D12InitApp::BuildRoomRenderItem()
 	//XMStoreFloat4x4(&skullCopyRitem->world,
 	//	DirectX::XMMatrixScaling(0.5f, 0.5f, 0.5f) * DirectX::XMMatrixRotationY(1.57f) * DirectX::XMMatrixTranslation(0.0f, -1.5f, 5.0f));
 	//skullCopyRitem->objCBIndex = 5;
-
 	//ritemLayer[(int)RenderLayer::Opaque].push_back(skullCopyRitem.get());
+
+	auto skullShadowRitem = std::make_unique<RenderItem>();
+	*skullShadowRitem = *skullRitem;
+	skullShadowRitem->objCBIndex = 5;
+	skullShadowRitem->mat = materials["shadow"].get();
+	mSkullShadowRitem = skullShadowRitem.get();
+	ritemLayer[(int)RenderLayer::Shadow].push_back(skullShadowRitem.get());
 
 
 	//move会释放Ritem内存，所以必须在ritemLayer之后执行
@@ -1737,6 +1809,7 @@ void D3D12InitApp::BuildRoomRenderItem()
 	allRitems.push_back(std::move(mirrorRitem));
 	allRitems.push_back(std::move(skullRitem));
 	allRitems.push_back(std::move(skullMirrorRitem));
+	allRitems.push_back(std::move(skullShadowRitem));
 	//allRitems.push_back(std::move(skullCopyRitem));
 }
 
